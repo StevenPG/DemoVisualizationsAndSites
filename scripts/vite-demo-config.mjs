@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { defineConfig, mergeConfig } from 'vite';
-import { distDir, demoBase } from './paths.mjs';
+import { demoBase, demosDir, distDir } from './paths.mjs';
 
 /**
  * Shared Vite config for a demo. Every demo is built as a standalone site that
@@ -18,7 +18,10 @@ export function defineDemoConfig(slug, overrides = {}) {
   const base = defineConfig({
     base: demoBase(slug),
     build: {
-      outDir: path.join(distDir, 'demos', slug),
+      // Relative to the demo's own root on purpose: some plugins (vite-plugin-cesium
+      // among them) do their own `path.join(root, outDir)` to find the output, which
+      // silently produces a nonsense nested path if this is absolute.
+      outDir: path.relative(path.join(demosDir, slug), path.join(distDir, 'demos', slug)),
       emptyOutDir: true,
     },
   });

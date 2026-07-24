@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AGL Airspaces over Stone Mountain — PostGIS tessellation demo</title>
+    <meta
+      name="description"
+      content="Terrain-following AGL airspace volumes tessellated in PostGIS, with 3D conflict detection, rendered in CesiumJS."
+    />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9889;</text></svg>" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+    <div id="panel">
+      <a class="back" href="/">← all demos</a>
+      <h1>AGL airspaces over Stone&nbsp;Mountain</h1>
+      <div class="sub" id="meta">loading…</div>
+      <div id="toggles"></div>
+      <div id="modes">
+        <label
+          ><input type="radio" name="mode" value="surface" checked />
+          smooth volumes (floor + ceiling)</label
+        >
+        <label
+          ><input type="radio" name="mode" value="cells" />
+          individual cells (the actual solids)</label
+        >
+      </div>
+      <hr />
+      <div id="matrix"></div>
+      <div id="hint">
+        Check an airspace to load it. Click a red matrix entry to highlight just that pair's
+        conflict; <i>touch</i> means shared faces but zero shared volume (the stacked pair).
+      </div>
+      <div id="cellinfo"></div>
+      <div id="warn"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

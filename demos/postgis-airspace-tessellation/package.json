@@ -1,0 +1,14 @@
+{
+  "name": "@demo/postgis-airspace-tessellation",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "cesium": "^1.143.0",
+    "vite-plugin-cesium": "^1.2.23"
+  }
+}

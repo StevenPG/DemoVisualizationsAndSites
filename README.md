@@ -57,6 +57,33 @@ rules keep it deployable as part of the bundle:
 Demos share no CSS or components on purpose — each one should be free to look
 however its article needs. Copy between them if that stops being true.
 
+### CesiumJS demos
+
+Use the npm package rather than the CDN, so the demo has no third-party runtime
+dependency — same as `elden-ring-3d-map`:
+
+```js
+import cesium from 'vite-plugin-cesium';
+import { fixCesiumSubpath } from '../../scripts/vite-cesium.mjs';
+import { defineDemoConfig } from '../../scripts/vite-demo-config.mjs';
+
+export default defineDemoConfig('my-slug', { plugins: [cesium(), fixCesiumSubpath()] });
+```
+
+`fixCesiumSubpath()` is required here and not in a single-site repo:
+vite-plugin-cesium builds one string from `base` and uses it both as the URL it
+injects into the HTML and as the copy destination for Cesium's static assets, so
+under `/demos/<slug>/` the assets land one directory tree too deep. The plugin
+moves them where the page looks. Cesium adds ~14 MB of static assets to that
+demo's output — well inside Cloudflare Pages' 25 MiB-per-file and 20,000-file
+limits, but worth knowing before adding many Cesium demos.
+
+Set `VITE_CESIUM_ION_TOKEN` (in `.env.local`, or as a build-time environment
+variable in Cloudflare Pages) to use Cesium World Terrain and Bing imagery.
+Without it the viewer falls back to free, key-less ESRI World Elevation and
+World Imagery. The token is baked into the built bundle, so use a scoped,
+read-only Ion token.
+
 ## Deploying to Cloudflare Pages
 
 Connect the repo and use:
@@ -88,5 +115,20 @@ scripts/
   dev.mjs                dev server for one site
   new-demo.mjs           scaffolder
   manifest.mjs           manifest loading + validation
+  vite-demo-config.mjs   shared Vite config for a demo
+  vite-cesium.mjs        sub-path fix for vite-plugin-cesium
   template/              what `npm run new` copies
 ```
+
+## Demos
+
+| Slug | Source |
+| --- | --- |
+| `postgis-airspace-tessellation` | `blog/postgis-airspace-tessellation/viewer` in [DemosAndArticleContent](https://github.com/StevenPG/DemosAndArticleContent) |
+| `hello-world` | scaffold placeholder, kept as a draft |
+
+The PostGIS viewer is a port, not a fork: the geometry, conflict-matrix and
+picking logic are unchanged from the original. Only the data path, the Ion token
+plumbing and the Cesium import differ. `public/data/cells.json` is a snapshot of
+that repo's `viewer/data/cells.json` — regenerate it there (`run.sh`, then
+`scripts/export_cells.py`) and copy it across to refresh the demo.

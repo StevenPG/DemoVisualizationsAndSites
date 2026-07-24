@@ -1,0 +1,150 @@
+html,
+body,
+#cesiumContainer {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  background: rgba(20, 24, 32, 0.88);
+  color: #eee;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font: 13px/1.5 system-ui, sans-serif;
+  max-width: 340px;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+}
+
+#panel .back {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #9ab;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+#panel .back:hover {
+  color: #fff;
+}
+
+#panel h1 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+#panel .sub {
+  color: #9ab;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+#panel label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+#panel .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  display: inline-block;
+  flex: none;
+}
+
+#panel .range {
+  color: #9ab;
+  margin-left: auto;
+  font-size: 11px;
+}
+
+#panel hr {
+  border: none;
+  border-top: 1px solid #345;
+  margin: 10px 0;
+}
+
+#hint {
+  color: #9ab;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+#cellinfo {
+  font-size: 11px;
+  color: #cde;
+  margin-top: 8px;
+  white-space: pre-line;
+}
+
+#warn {
+  color: #fc6;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+#matrix table {
+  border-collapse: collapse;
+  margin: 6px 0 4px;
+  font-size: 11px;
+}
+
+#matrix th,
+#matrix td {
+  padding: 3px 7px;
+  text-align: center;
+  border: 1px solid #345;
+}
+
+#matrix th {
+  color: #9ab;
+  font-weight: 600;
+}
+
+#matrix td.hit {
+  color: #f88;
+  cursor: pointer;
+}
+
+#matrix td.hit:hover {
+  background: rgba(225, 85, 84, 0.25);
+}
+
+#matrix td.sel {
+  background: rgba(225, 85, 84, 0.4);
+  color: #fff;
+}
+
+#matrix td.touch {
+  color: #8c9;
+}
+
+#matrix td.none {
+  color: #567;
+}
+
+#matrix .modebtn {
+  display: inline-block;
+  margin: 2px 6px 0 0;
+  padding: 1px 8px;
+  border: 1px solid #345;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #9ab;
+}
+
+#matrix .modebtn.sel {
+  background: rgba(225, 85, 84, 0.4);
+  color: #fff;
+}

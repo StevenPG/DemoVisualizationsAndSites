@@ -1,6 +1,7 @@
+import path from 'node:path';
 import { defineConfig } from 'vite';
 import { loadManifest } from '../scripts/manifest.mjs';
-import { distDir, manifestPath } from '../scripts/paths.mjs';
+import { distDir, landingDir, manifestPath } from '../scripts/paths.mjs';
 
 const VIRTUAL_ID = 'virtual:demos';
 const RESOLVED_ID = `\0${VIRTUAL_ID}`;
@@ -38,8 +39,9 @@ export default defineConfig({
   plugins: [demoManifest()],
   build: {
     // Straight into dist/ — the demos are then built into dist/demos/<slug>/,
-    // so emptyOutDir must stay off here to avoid wiping them.
-    outDir: distDir,
+    // so emptyOutDir must stay off here to avoid wiping them. Relative to the
+    // landing root for the same reason as the demos (see vite-demo-config.mjs).
+    outDir: path.relative(landingDir, distDir),
     emptyOutDir: false,
   },
 });

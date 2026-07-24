@@ -2,15 +2,22 @@
   "$schema": "./demos.schema.json",
   "demos": [
     {
-      "slug": "hello-world",
-      "title": "Hello World",
-      "description": "A placeholder demo that proves the build pipeline and the landing page wiring work end to end.",
-      "tags": [
-        "scaffold"
-      ],
+      "slug": "postgis-airspace-tessellation",
+      "title": "Terrain-Following Airspace Volumes with PostGIS",
+      "description": "AGL airspace volumes tessellated into terrain-following 3D solids in PostGIS, with the pairwise conflict matrix computed in SQL — rendered over real satellite terrain at Stone Mountain, GA.",
+      "tags": ["postgis", "cesium", "3d", "sql"],
       "published": "2026-07-24",
       "article": null,
       "status": "live"
+    },
+    {
+      "slug": "hello-world",
+      "title": "Hello World",
+      "description": "A placeholder demo that proves the build pipeline and the landing page wiring work end to end.",
+      "tags": ["scaffold"],
+      "published": "2026-07-24",
+      "article": null,
+      "status": "draft"
     }
   ]
 }
