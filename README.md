@@ -90,7 +90,10 @@ Connect the repo and use:
 
 - **Build command:** `npm run build`
 - **Build output directory:** `dist`
-- **Node version:** 20+ (set `NODE_VERSION=20` in the Pages env vars if needed)
+
+Node is pinned by the committed `.node-version` (22), which Pages reads — Vite 7
+requires `^20.19 || >=22.12`, and Pages' default Node version depends on when the
+project was created, so leaving it implicit can fail the build on an older project.
 
 Everything is static — no Functions, no runtime config. Caching headers live in
 `landing/public/_headers`; that whole folder is copied to the root of `dist/`.
