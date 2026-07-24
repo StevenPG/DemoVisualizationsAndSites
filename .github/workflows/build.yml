@@ -1,0 +1,21 @@
+name: build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Catches a demo that is missing from demos.json, a broken slug, or a
+      # demo whose Vite config writes outside dist/demos/<slug>/ — all of which
+      # would otherwise only show up as a broken Cloudflare deploy.
+      - run: npm run build

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demos</title>
+    <meta
+      name="description"
+      content="Interactive demos and visualizations that accompany the articles."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9889;</text></svg>" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow" data-eyebrow></p>
+        <h1 data-title></h1>
+        <p class="tagline" data-tagline></p>
+      </header>
+
+      <main>
+        <ul class="grid" data-grid></ul>
+        <p class="empty" data-empty hidden>
+          No demos published yet. Run <code>npm run new my-demo</code> to add the first one.
+        </p>
+      </main>
+
+      <footer class="colophon">
+        <a data-repo href="#">Source on GitHub</a>
+      </footer>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

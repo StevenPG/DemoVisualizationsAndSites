@@ -1,0 +1,16 @@
+{
+  "$schema": "./demos.schema.json",
+  "demos": [
+    {
+      "slug": "hello-world",
+      "title": "Hello World",
+      "description": "A placeholder demo that proves the build pipeline and the landing page wiring work end to end.",
+      "tags": [
+        "scaffold"
+      ],
+      "published": "2026-07-24",
+      "article": null,
+      "status": "live"
+    }
+  ]
+}

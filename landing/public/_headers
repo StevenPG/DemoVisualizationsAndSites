@@ -1,0 +1,14 @@
+# Cloudflare Pages headers. Vite fingerprints everything under assets/, so those
+# are safe to cache forever; HTML stays revalidated so a redeploy is picked up.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/demos/*/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
