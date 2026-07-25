@@ -33,14 +33,16 @@ disagree.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Dev server for the landing page |
-| `npm run dev <slug>` | Dev server for one demo |
+| `npm run dev` | Dev server for the landing page, with every demo mounted at `/demos/<slug>/` |
+| `npm run dev <slug>` | Dev server for one demo, served at `/` |
 | `npm run build` | Builds everything into `dist/` |
 | `npm run preview` | Builds, then serves `dist/` so you can click through the real routes |
 | `npm run new <slug> -- "Title"` | Scaffolds a demo and registers it |
 
-In dev the landing page's cards link to `/demos/<slug>/`, which only exists in a
-real build — use `npm run preview` to test the links.
+`npm run dev` mirrors the production routes: the landing cards link to
+`/demos/<slug>/`, and each demo runs as its own Vite server behind that prefix
+with its own plugins and HMR. Use `npm run dev <slug>` when you only care about
+one demo and want it at the root.
 
 ## How a demo is wired
 
