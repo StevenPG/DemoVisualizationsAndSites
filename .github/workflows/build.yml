@@ -12,9 +12,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
+      # Vite does not typecheck, so a TypeScript demo would otherwise deploy
+      # green with type errors in it.
+      - run: npm run typecheck
       # Catches a demo that is missing from demos.json, a broken slug, or a
       # demo whose Vite config writes outside dist/demos/<slug>/ — all of which
       # would otherwise only show up as a broken Cloudflare deploy.

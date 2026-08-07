@@ -29,6 +29,26 @@ Adding one by hand works too: create `demos/<slug>/` with a `package.json`,
 then add the manifest entry. The build fails loudly if a folder and the manifest
 disagree.
 
+### Demos that are more than one app
+
+A demo that has to build several bundles — a micro frontend console, say — can
+take over its own build by adding two files, and then does not need a root
+`index.html` or `vite.config.js` at all:
+
+| File | Export | Called with |
+| --- | --- | --- |
+| `demos/<slug>/build.mjs` | `default async ({ base, outDir })` | The public base and the output directory |
+| `demos/<slug>/dev.mjs` | `devApps({ base })` → `{ apps, files }` | The base each app should be served under |
+
+`apps` is a list of `{ name, base, root, define }`; the dev server mounts one
+Vite server per entry, longest base first, each with its own plugins and HMR.
+`files` maps a URL to a function returning its contents, for anything generated
+(`registry.json` in the micro frontend demo).
+
+The escape hatch is narrow on purpose: the build still has to leave an
+`index.html` at `dist/demos/<slug>/index.html`, and `npm run build` fails if it
+does not. See `demos/micro-frontend-airspace-console/` for the worked example.
+
 ## Commands
 
 | Command | What it does |
@@ -129,6 +149,7 @@ scripts/
 
 | Slug | Source |
 | --- | --- |
+| `micro-frontend-airspace-console` | written here |
 | `cesium-moving-points-stress-test` | written here |
 | `postgis-airspace-tessellation` | `blog/postgis-airspace-tessellation/viewer` in [DemosAndArticleContent](https://github.com/StevenPG/DemosAndArticleContent) |
 | `hello-world` | scaffold placeholder, kept as a draft |
@@ -138,6 +159,32 @@ picking logic are unchanged from the original. Only the data path, the Ion token
 plumbing and the Cesium import differ. `public/data/cells.json` is a snapshot of
 that repo's `viewer/data/cells.json` — regenerate it there (`run.sh`, then
 `scripts/export_cells.py`) and copy it across to refresh the demo.
+
+### `micro-frontend-airspace-console`
+
+A reference micro frontend setup, built as a working application: one console
+assembled in the browser from four independently built bundles owned by three
+teams, integrated only through a versioned contract package and a registry the
+shell reads at runtime. Module Federation 2 via `@module-federation/vite`, React
+19 + TypeScript for the shell and two remotes, and Svelte 5 for a third to keep
+the boundary honest.
+
+It ships an inspector that makes the invisible parts visible: what loaded from
+where, proof that React is one shared instance across all four bundles (compared
+by export reference — comparing module namespace objects reports a *false*
+duplicate, which is a trap worth knowing about), a live log of everything
+crossing the boundary, fault injection, and a runtime swap between two separately
+built releases of the same remote.
+
+It is the one demo here with its own `README.md`, because it is meant to be read
+as well as clicked: `demos/micro-frontend-airspace-console/README.md` covers the
+contract design, why the registry is what makes the deploys independent, the
+routing and styling decisions, the deliberate simplifications, and how to split
+it into real per-team repositories.
+
+It is also the demo that owns its own build (see [above](#demos-that-are-more-than-one-app)):
+five Vite builds — one per app, plus a second release of one remote so the
+deploy-skew switch has something real to switch between.
 
 ### `cesium-moving-points-stress-test`
 

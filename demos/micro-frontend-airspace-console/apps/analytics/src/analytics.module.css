@@ -1,0 +1,266 @@
+/* CSS Modules again — this app and the Operations Board both have a `.root`,
+   and they never collide because neither ships that name. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
+  font-family: var(--ax-font, ui-sans-serif, system-ui, sans-serif);
+  color: var(--ax-text, #e6edf3);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--ax-muted, #8b949e);
+  font-size: 0.8rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.7rem;
+}
+
+.tile {
+  border: 1px solid var(--ax-border, #30363d);
+  border-radius: var(--ax-radius, 10px);
+  background: var(--ax-surface, #161b22);
+  padding: 0.7rem 0.85rem;
+}
+
+.tileValue {
+  font: 650 1.6rem/1.1 var(--ax-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.tileLabel {
+  color: var(--ax-muted, #8b949e);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 0.9rem;
+}
+
+@media (max-width: 62rem) {
+  .panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.figure {
+  margin: 0;
+  border: 1px solid var(--ax-border, #30363d);
+  border-radius: var(--ax-radius, 10px);
+  background: var(--ax-surface, #161b22);
+  padding: 0.85rem 1rem 0.7rem;
+  min-width: 0;
+}
+
+.figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.figTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.figNote {
+  color: var(--ax-muted, #8b949e);
+  font-size: 0.7rem;
+}
+
+.legend {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--ax-muted, #8b949e);
+}
+
+.swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: none;
+}
+
+.grid {
+  stroke: var(--ax-grid, #30363d);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.axisLabel {
+  fill: var(--ax-muted, #8b949e);
+  font-size: 10px;
+  font-family: var(--ax-mono, ui-monospace, monospace);
+}
+
+.series {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.crosshair {
+  stroke: var(--ax-muted, #8b949e);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.marker {
+  stroke: var(--ax-surface, #161b22);
+  stroke-width: 2;
+}
+
+.readout {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.4rem;
+  font-family: var(--ax-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--ax-muted, #8b949e);
+  min-height: 1.2rem;
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  /* 2px of surface between adjacent bars, so the marks never fuse. */
+  gap: 2px;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(6rem, 9rem) 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0.2rem 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.barLabel {
+  font-size: 0.74rem;
+  color: var(--ax-muted, #8b949e);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barTrack {
+  height: 0.7rem;
+  min-width: 0;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  /* Rounded only at the data end; the baseline end stays square so the bar
+     still reads as anchored to zero. */
+  border-radius: 0 4px 4px 0;
+}
+
+.barValue {
+  font-family: var(--ax-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableToggle {
+  appearance: none;
+  border: 1px solid var(--ax-border, #30363d);
+  background: var(--ax-surface-2, #1c2129);
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--ax-radius-sm, 7px);
+  cursor: pointer;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--ax-border, #30363d) 55%, transparent);
+}
+
+.table th {
+  color: var(--ax-muted, #8b949e);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.focus {
+  border: 1px solid color-mix(in oklab, var(--ax-accent, #58a6ff) 45%, var(--ax-border, #30363d));
+  background: color-mix(in oklab, var(--ax-accent, #58a6ff) 8%, var(--ax-surface, #161b22));
+  border-radius: var(--ax-radius, 10px);
+  padding: 0.6rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+.footnote {
+  color: var(--ax-muted, #8b949e);
+  font-size: 0.7rem;
+  font-family: var(--ax-mono, ui-monospace, monospace);
+}
+
+.skeleton {
+  height: 12rem;
+  border-radius: var(--ax-radius, 10px);
+  border: 1px solid var(--ax-border, #30363d);
+  opacity: 0.5;
+}
