@@ -20,6 +20,17 @@ export const MAX_TOTAL = MAX_PER_KIND * 4;
  */
 export const ENTITY_MODE_WARN_AT = 20_000;
 
+/**
+ * What the page loads with, per kind.
+ *
+ * Deliberately tiny. This is a stress test, so the temptation is to open under
+ * load — but the first frame has to land on a phone, on integrated graphics and
+ * on a software rasteriser, and someone whose tab janks on arrival never gets as
+ * far as the sliders. 250 each is enough to read as traffic and cheap enough to
+ * be free everywhere; turning it up is the entire point of the panel.
+ */
+const DEFAULT_COUNT = 250;
+
 export const KINDS = [
   {
     id: 'ship',
@@ -29,7 +40,7 @@ export const KINDS = [
     blurb: 'Surface vessels. Spawn in open water and get retired if they run into a coastline.',
     domain: 'ocean',
     color: '#33b1ff',
-    count: { min: 0, max: MAX_PER_KIND, value: 2000 },
+    count: { min: 0, max: MAX_PER_KIND, value: DEFAULT_COUNT },
     // Real-world-ish speeds. The global time multiplier is what makes them
     // visible at globe scale; the numbers reported in the info box are the
     // honest m/s, not the exaggerated ones.
@@ -44,7 +55,7 @@ export const KINDS = [
     blurb: 'Cruising traffic between 3 and 12 km. Free to fly over anything.',
     domain: 'any',
     color: '#ffd166',
-    count: { min: 0, max: MAX_PER_KIND, value: 2000 },
+    count: { min: 0, max: MAX_PER_KIND, value: DEFAULT_COUNT },
     speed: { min: 20, max: 600, value: 240, step: 10, unit: 'm/s', hint: 'cruise' },
     leg: { min: 100, max: 15000, value: 2200, step: 100, unit: 'km' },
   },
@@ -56,7 +67,7 @@ export const KINDS = [
     blurb: 'Ride the sampled terrain surface. Spawn inland and get retired at the water.',
     domain: 'land',
     color: '#06d6a0',
-    count: { min: 0, max: MAX_PER_KIND, value: 2000 },
+    count: { min: 0, max: MAX_PER_KIND, value: DEFAULT_COUNT },
     speed: { min: 1, max: 120, value: 20, step: 1, unit: 'm/s', hint: 'road speed' },
     leg: { min: 10, max: 3000, value: 220, step: 10, unit: 'km' },
   },
@@ -68,7 +79,7 @@ export const KINDS = [
     blurb: 'Circular orbits, 400–1200 km, random inclination and right ascension.',
     domain: 'orbit',
     color: '#ef476f',
-    count: { min: 0, max: MAX_PER_KIND, value: 2000 },
+    count: { min: 0, max: MAX_PER_KIND, value: DEFAULT_COUNT },
     // Orbital velocity is a consequence of altitude, so the "speed" slider here
     // is a frank fudge factor on the mean motion. Labelled as such in the panel.
     speed: { min: 0.1, max: 20, value: 1, step: 0.1, unit: '×', hint: 'orbital rate' },
