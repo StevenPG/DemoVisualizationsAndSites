@@ -26,10 +26,11 @@ export const ENTITY_MODE_WARN_AT = 20_000;
  * Deliberately tiny. This is a stress test, so the temptation is to open under
  * load — but the first frame has to land on a phone, on integrated graphics and
  * on a software rasteriser, and someone whose tab janks on arrival never gets as
- * far as the sliders. 250 each is enough to read as traffic and cheap enough to
- * be free everywhere; turning it up is the entire point of the panel.
+ * far as the sliders. 100 each is sparse but legible, and costs so little that
+ * nothing you can measure is attributable to it; turning it up is the entire
+ * point of the panel.
  */
-const DEFAULT_COUNT = 250;
+const DEFAULT_COUNT = 100;
 
 export const KINDS = [
   {
@@ -92,7 +93,11 @@ export const GLOBAL_DEFAULTS = {
   // makes the scene look alive; every reported speed stays in real units.
   timeScale: 25,
   pointSize: 4,
-  terrain: true,
+  // Off on arrival. Elevation tile streaming is by a wide margin the most
+  // expensive thing this page can do on first load — far more than the movers —
+  // and it competes for the same frames the HUD is trying to measure. The
+  // checkbox turns it on in one click, which is the point of having it.
+  terrain: false,
   renderMode: 'primitives', // 'primitives' | 'entities'
   rampFpsFloor: 30,
 };
