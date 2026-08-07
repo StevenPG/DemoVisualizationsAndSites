@@ -1,0 +1,113 @@
+/*
+ * The design system, as it crosses the team boundary.
+ *
+ * These custom properties are a published API: every remote styles itself with
+ * them, and they are versioned in the contract's docs alongside the TypeScript.
+ * A shared *component library* would be the obvious alternative and is a much
+ * worse dependency — components change weekly, so every team would be pinned to
+ * a package that forces coordinated upgrades, which is the exact coupling micro
+ * frontends are meant to remove. Tokens change on the scale of a rebrand.
+ *
+ * Because they cascade from :root, a theme switch in the shell reaches every
+ * remote — including the Svelte one — with no message passing at all. The theme
+ * is also on SharedState, for remotes that need to branch on it in logic
+ * (a canvas fill, an image swap) rather than in CSS.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ax-bg: #0b0f16;
+  --ax-surface: #11161f;
+  --ax-surface-2: #171d28;
+  --ax-border: #262e3d;
+  --ax-text: #e6edf3;
+  --ax-muted: #8b98ab;
+
+  --ax-accent: #58a6ff;
+  --ax-accent-contrast: #04101f;
+
+  --ax-info: #58a6ff;
+  --ax-advisory: #d29922;
+  --ax-warning: #f0883e;
+  --ax-critical: #f85149;
+  --ax-ok: #3fb950;
+
+  /*
+   * Chart palette. Categorical slots are assigned in fixed order and never
+   * cycled; both modes were validated against their own surface for lightness
+   * band, chroma, colour-vision separation and contrast — the dark values are
+   * separately chosen steps of the same hues, not an automatic flip.
+   * A remote that plots something reaches for these instead of inventing a
+   * palette, which is how four teams end up with one visual language.
+   */
+  --ax-series-1: #3987e5;
+  --ax-series-2: #d95926;
+  --ax-series-3: #199e70;
+  --ax-grid: #262e3d;
+
+  --ax-radius: 10px;
+  --ax-radius-sm: 7px;
+  --ax-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+
+  --ax-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ax-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --ax-bg: #f5f7fa;
+  --ax-surface: #ffffff;
+  --ax-surface-2: #eef1f6;
+  --ax-border: #d3dae4;
+  --ax-text: #131a24;
+  --ax-muted: #5b6675;
+
+  --ax-accent: #0b62d6;
+  --ax-accent-contrast: #ffffff;
+
+  --ax-info: #0b62d6;
+  --ax-advisory: #9a6700;
+  --ax-warning: #bc4c00;
+  --ax-critical: #cf222e;
+  --ax-ok: #1a7f37;
+
+  --ax-shadow: 0 12px 32px rgb(16 24 40 / 12%);
+
+  --ax-series-1: #2a78d6;
+  --ax-series-2: #eb6834;
+  --ax-series-3: #1baf7a;
+  --ax-grid: #d3dae4;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--ax-bg);
+  color: var(--ax-text);
+  font-family: var(--ax-font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#shell-root {
+  height: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ax-accent);
+  outline-offset: 2px;
+}

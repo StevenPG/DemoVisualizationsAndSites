@@ -2,6 +2,15 @@
   "$schema": "./demos.schema.json",
   "demos": [
     {
+      "slug": "micro-frontend-airspace-console",
+      "title": "A Micro Frontend Reference: Two Teams, One Page",
+      "description": "One console assembled in the browser from four independently built and deployed bundles, owned by three teams and integrated only through a versioned contract. Module Federation with React 19 and TypeScript, plus one Svelte remote to prove the boundary is framework-neutral — and an inspector that shows what loaded from where, proves React is shared rather than duplicated, and lets you break a remote on purpose to watch the blast radius stop at its rectangle.",
+      "tags": ["micro-frontends", "module-federation", "react", "typescript", "architecture"],
+      "published": "2026-08-07",
+      "article": null,
+      "status": "live"
+    },
+    {
       "slug": "cesium-moving-points-stress-test",
       "title": "How Many Moving Points Can CesiumJS Hold?",
       "description": "Tens of thousands of ships, aircraft, ground vehicles and satellites moving at once as point primitives over ESRI imagery, with a live frame-budget breakdown, an auto-ramp that finds the breaking point, and a click-to-inspect swap from primitive to entity.",

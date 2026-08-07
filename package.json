@@ -5,13 +5,16 @@
   "description": "A single deployable bundling many standalone demo sites, plus a landing page that links to them.",
   "workspaces": [
     "landing",
-    "demos/*"
+    "demos/*",
+    "demos/*/apps/*",
+    "demos/*/packages/*"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "preview": "npm run build && npx --yes serve dist",
-    "new": "node scripts/new-demo.mjs"
+    "new": "node scripts/new-demo.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "vite": "^7.1.5"
