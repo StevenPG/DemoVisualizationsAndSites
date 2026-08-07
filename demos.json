@@ -2,6 +2,15 @@
   "$schema": "./demos.schema.json",
   "demos": [
     {
+      "slug": "cesium-moving-points-stress-test",
+      "title": "How Many Moving Points Can CesiumJS Hold?",
+      "description": "Tens of thousands of ships, aircraft, ground vehicles and satellites moving at once as point primitives over ESRI imagery, with a live frame-budget breakdown, an auto-ramp that finds the breaking point, and a click-to-inspect swap from primitive to entity.",
+      "tags": ["cesium", "performance", "webgl", "3d"],
+      "published": "2026-08-07",
+      "article": null,
+      "status": "live"
+    },
+    {
       "slug": "postgis-airspace-tessellation",
       "title": "Terrain-Following Airspace Volumes with PostGIS",
       "description": "AGL airspace volumes tessellated into terrain-following 3D solids in PostGIS, with the pairwise conflict matrix computed in SQL — rendered over real satellite terrain at Stone Mountain, GA.",
