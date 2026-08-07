@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How many moving points can CesiumJS hold? — a stress test</title>
+    <meta
+      name="description"
+      content="A CesiumJS performance test: tens of thousands of ships, aircraft, ground vehicles and satellites moving at once as point primitives, with a live frame budget breakdown and a click-to-inspect entity swap."
+    />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#128752;</text></svg>" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <aside id="panel" aria-label="Simulation controls">
+      <header class="panel-head">
+        <a class="back" href="/">← all demos</a>
+        <h1>Moving points, at scale</h1>
+        <p class="lede">
+          Ships, aircraft, ground vehicles and satellites, each a point primitive with its own
+          heading and a leg to finish before it retires. Turn the counts up until it breaks. Click
+          anything to promote it to a full entity.
+        </p>
+      </header>
+
+      <div id="hud" class="hud"></div>
+      <p id="status" class="status" hidden></p>
+      <div id="controls"></div>
+
+      <footer class="panel-foot">
+        <p>
+          Imagery and elevation are keyless ESRI services. The land/ocean mask is decoded at startup
+          from the Natural Earth II textures inside Cesium's own bundled assets, which is what keeps
+          ships in the water and vehicles on the ground.
+        </p>
+      </footer>
+    </aside>
+
+    <button id="panel-toggle" type="button" aria-expanded="true" aria-controls="panel" title="Hide the panel">
+      <span aria-hidden="true">‹</span><span class="sr-only">Toggle controls</span>
+    </button>
+
+    <div id="loading" class="loading"><div class="loading-inner">Building the world…</div></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

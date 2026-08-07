@@ -129,6 +129,7 @@ scripts/
 
 | Slug | Source |
 | --- | --- |
+| `cesium-moving-points-stress-test` | written here |
 | `postgis-airspace-tessellation` | `blog/postgis-airspace-tessellation/viewer` in [DemosAndArticleContent](https://github.com/StevenPG/DemosAndArticleContent) |
 | `hello-world` | scaffold placeholder, kept as a draft |
 
@@ -137,3 +138,32 @@ picking logic are unchanged from the original. Only the data path, the Ion token
 plumbing and the Cesium import differ. `public/data/cells.json` is a snapshot of
 that repo's `viewer/data/cells.json` — regenerate it there (`run.sh`, then
 `scripts/export_cells.py`) and copy it across to refresh the demo.
+
+### `cesium-moving-points-stress-test`
+
+Answers "how many independently moving points can CesiumJS hold" by putting up
+to 200,000 of them on the globe at once — ships, aircraft, ground vehicles and
+satellites, each with its own heading and a leg to finish before it retires and
+is replaced. The HUD splits the frame into simulation, renderer sync and
+everything Cesium does, so the answer comes with a reason attached, and a
+renderer switch rebuilds the same population through the Entity API for the
+comparison. Clicking any point promotes it to a real entity with a pin, a track
+and a property table.
+
+Two things in it are worth knowing about before editing:
+
+- **The land/ocean mask is free.** Cesium's static assets already contain the
+  Natural Earth II base layer as a TMS pyramid. `src/landmask.js` fetches the 32
+  level-2 tiles, classifies each pixel by colour, and gets a 2048×1024 global
+  mask at ~19 km resolution for no new dependency and no third-party request. It
+  measures 28.3% land against Earth's real 29%. If the classification ever drifts
+  it fails loudly rather than silently spawning ships in deserts.
+- **The simulation is structure-of-arrays on purpose.** Slots are handed out by a
+  free list and carry a generation counter, so a selection can tell "still alive"
+  from "that slot was recycled". Movement uses a local tangent-plane step rather
+  than a rhumb-line formula — below a pixel of error per frame, and a fraction of
+  the transcendentals.
+
+No Ion token: imagery is keyless ESRI World Imagery and elevation is keyless ESRI
+World Elevation, both with bounded timeouts so a blocked endpoint degrades to a
+flat ellipsoid instead of hanging on the loading screen.
