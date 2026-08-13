@@ -83,7 +83,7 @@ export function createHud({ actions, audio }) {
         <p class="empty-note">
           ${
             yours.length
-              ? 'Select one of your columns to give it orders. Press <b>Tab</b> to cycle through the ones that still have moves left.'
+              ? '<b>Click</b> one of your columns to give it orders. Press <b>Tab</b> to look through the ones that still have moves left.'
               : 'You have no columns in the field. Raise an officer at your castle to begin.'
           }
         </p>
@@ -119,6 +119,7 @@ export function createHud({ actions, audio }) {
         ${stack.attacked ? '<dt>Fought</dt><dd>this turn</dd>' : ''}
       </dl>
 
+      ${yours && !ui.armed && state.activeSide === 'crown' ? notArmedNote() : ''}
       ${yours ? orderButtons(state, stack, ui) : enemyNote(state, stack)}
       ${ui.mode === 'split' ? splitForm(stack) : ''}
       ${ui.mode === 'recruit' ? recruitForm(state, stack) : ''}
@@ -159,6 +160,17 @@ export function createHud({ actions, audio }) {
         ${ui.mode !== 'select' ? '<button type="button" data-order="cancel"><span>Cancel</span></button>' : ''}
       </div>
     `;
+  }
+
+  /**
+   * Shown for a column that is selected but not armed — reached by Tab rather
+   * than by clicking it. The panel orders below still work; only orders given
+   * by clicking the board are held back.
+   */
+  function notArmedNote() {
+    return `<p class="empty-note" style="margin-bottom:0.7rem">
+      Looking at this column. <b>Click it on the map</b> to give it marching orders.
+    </p>`;
   }
 
   function enemyNote(state, stack) {
@@ -238,6 +250,7 @@ export function createHud({ actions, audio }) {
    */
   function forecastBlock(state, stack, ui) {
     if (stack.side !== 'crown' || stack.attacked || stack.troops <= 0) return '';
+    if (!ui.armed) return '';
 
     const target = ui.hoveredHex !== null && neighboursOf(stack.hex).includes(ui.hoveredHex) ? ui.hoveredHex : null;
     if (target === null) return '';
@@ -375,6 +388,9 @@ export function createHud({ actions, audio }) {
     endTurn.textContent = 'End turn';
 
     if (ui.mode === 'wall') prompt.textContent = 'Click a hex beside the selected column to wall that edge.';
+    else if (ui.selectedId !== null && !ui.armed) {
+      prompt.textContent = 'Click that column on the map to give it orders.';
+    }
     else if (ui.mode === 'split-place') prompt.textContent = 'Click an empty adjacent hex for the detachment.';
     else if (ui.pendingAttack !== null) prompt.textContent = 'Click again to commit to the attack.';
     else {

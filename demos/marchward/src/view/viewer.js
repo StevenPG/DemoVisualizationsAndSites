@@ -48,8 +48,21 @@ export async function createViewer(containerId, theatre, { shadows = true } = {}
     );
   } catch (error) {
     console.warn('[marchward] ESRI imagery unavailable:', error);
-    notes.push('Satellite imagery was unreachable — the ground beyond the board is plain.');
-    baseLayer = false;
+    // Cesium's own static assets already contain the Natural Earth II base
+    // layer as a TMS pyramid, so a blocked network falls back to real ground
+    // rather than to a flat colour — and needs no request off this origin.
+    try {
+      baseLayer = new Cesium.ImageryLayer(
+        await Cesium.TileMapServiceImageryProvider.fromUrl(
+          Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
+        ),
+      );
+      notes.push('Satellite imagery was unreachable — falling back to the offline base map.');
+    } catch (fallbackError) {
+      console.warn('[marchward] offline imagery unavailable too:', fallbackError);
+      notes.push('Imagery was unreachable — the ground beyond the board is plain.');
+      baseLayer = false;
+    }
   }
 
   const viewer = new Cesium.Viewer(containerId, {

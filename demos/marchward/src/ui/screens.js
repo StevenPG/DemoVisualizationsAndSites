@@ -175,6 +175,25 @@ export function renderSettings({ audio, settings, onChange }) {
     body.append(wrap);
   };
 
+  /** A slider over a plain settings value rather than an audio channel. */
+  const valueSlider = (label, hint, get, set, { min = 0, max = 100, format = (v) => `${v}%` } = {}) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'setting';
+    const initial = Math.round(get() * 100);
+    wrap.innerHTML = `
+      <label>${label}<b>${format(initial)}</b></label>
+      <input type="range" min="${min}" max="${max}" value="${initial}" />
+      ${hint ? `<small class="hint">${hint}</small>` : ''}
+    `;
+    const input = wrap.querySelector('input');
+    const readout = wrap.querySelector('b');
+    input.addEventListener('input', () => {
+      readout.textContent = format(Number(input.value));
+      set(Number(input.value) / 100);
+    });
+    body.append(wrap);
+  };
+
   const toggle = (label, hint, get, set) => {
     const row = document.createElement('div');
     row.className = 'toggle-row';
@@ -203,6 +222,17 @@ export function renderSettings({ audio, settings, onChange }) {
   slider('master', 'Master volume');
   slider('sfx', 'Effects');
   slider('music', 'Music', 'A generative drone rather than a loop — it never repeats.');
+
+  valueSlider(
+    'Terrain opacity',
+    'How solid the board sits over the satellite imagery of the real ground beneath it. Lower lets more of the actual place show through.',
+    () => settings.tileAlpha,
+    (value) => {
+      settings.tileAlpha = value;
+      onChange();
+    },
+    { min: 35, max: 100 },
+  );
 
   toggle(
     'Shadows',
@@ -372,10 +402,10 @@ export function renderRules() {
 
     <h3>Controls</h3>
     <ul>
-      <li><strong>Click</strong> one of your columns to select it, then click a highlighted hex to march there.</li>
+      <li><strong>Click</strong> one of your columns to take command of it, then click a highlighted hex to march there. Only clicking a column puts it under orders — until you do, clicking the map cannot move it.</li>
       <li><strong>Click an enemy</strong> on a red hex to attack it, or the castle to storm it.</li>
       <li><strong>Drag</strong> to pan, <strong>scroll</strong> to zoom, <strong>middle-drag</strong> to tilt.</li>
-      <li><strong>Space</strong> ends your turn. <strong>Tab</strong> cycles through columns with orders left. <strong>Escape</strong> clears the selection.</li>
+      <li><strong>Space</strong> ends your turn. <strong>Tab</strong> looks through the columns that still have moves left, without putting them under orders. <strong>Escape</strong> clears the selection.</li>
     </ul>
   `;
 }

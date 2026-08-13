@@ -33,7 +33,7 @@ const HIGHLIGHTS = {
  * The full set of tints for the current selection, as
  * `{ index, colour }` entries ready for the board's setTinted.
  */
-export function highlightsFor(state, board, { selectedId, mode }) {
+export function highlightsFor(state, board, { selectedId, mode, armed = false }) {
   const entries = [];
   const stack = selectedId === null ? null : state.stacks.get(selectedId);
   if (!stack) return entries;
@@ -45,6 +45,15 @@ export function highlightsFor(state, board, { selectedId, mode }) {
 
   if (mode === 'wall') {
     for (const edge of wallableEdgesFrom(state, stack)) push(edge, 'wall');
+    push(stack.hex, 'selected');
+    return entries;
+  }
+
+  // A column that has only been looked at gets marked, but nothing is offered
+  // to it. Lighting the movement range is the game saying "click here and this
+  // army marches", so it waits until the player has armed the column by
+  // clicking it.
+  if (!armed) {
     push(stack.hex, 'selected');
     return entries;
   }
@@ -89,14 +98,19 @@ export function wallableEdgesFrom(state, stack) {
 
 const edgeKeyOf = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** Mixes a highlight colour into a terrain colour by `strength`. */
+/**
+ * Mixes a highlight colour into a terrain colour by `strength`, keeping the
+ * base tile's alpha. Forcing alpha to 1 here would make every highlighted hex
+ * turn opaque against a translucent board, so the movement range would punch a
+ * solid hole in the ground it is drawn on.
+ */
 function blend(base, cssColour, strength) {
   const tint = Cesium.Color.fromCssColorString(cssColour);
   return new Cesium.Color(
     base.red + (tint.red - base.red) * strength,
     base.green + (tint.green - base.green) * strength,
     base.blue + (tint.blue - base.blue) * strength,
-    1,
+    base.alpha,
   );
 }
 

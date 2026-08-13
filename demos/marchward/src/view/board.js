@@ -13,7 +13,7 @@
  */
 
 import * as Cesium from 'cesium';
-import { SIEGE, TERRAIN } from '../config.js';
+import { RELIEF, SIEGE, TERRAIN } from '../config.js';
 import { CORNER_OFFSETS, HEX_CIRCUMRADIUS, HEX_COUNT, centreMeters, edgeEndpointsMeters } from '../hex.js';
 import { BASE_HEIGHT, colourFromHex, hexCentre, hexHeight } from './geo.js';
 
@@ -24,7 +24,7 @@ const WALL_THICKNESS = 260;
 // Terrain
 // --------------------------------------------------------------------------
 
-export function createBoard(scene, frame, map, theatre) {
+export function createBoard(scene, frame, map, theatre, { alpha = RELIEF.tileAlpha } = {}) {
   const up = localDirection(frame, 0, 0, 1);
   // Every hex is the same shape, so the six outward face normals are computed
   // once for the whole board rather than per prism.
@@ -38,7 +38,7 @@ export function createBoard(scene, frame, map, theatre) {
   const pickIds = new Array(HEX_COUNT);
 
   for (let i = 0; i < HEX_COUNT; i += 1) {
-    const colour = terrainColour(map, theatre, i);
+    const colour = terrainColour(map, theatre, i, alpha);
     baseColours[i] = colour;
     pickIds[i] = { kind: 'hex', index: i };
     instances[i] = new Cesium.GeometryInstance({
@@ -51,10 +51,17 @@ export function createBoard(scene, frame, map, theatre) {
   const primitive = scene.primitives.add(
     new Cesium.Primitive({
       geometryInstances: instances,
-      appearance: new Cesium.PerInstanceColorAppearance({ flat: false, translucent: false, closed: true }),
+      // `closed` stays true with translucency on: culling the back faces means
+      // a tile blends over the imagery beneath it rather than over the inside
+      // of its own far walls, which is what keeps it reading as ground rather
+      // than as a glass box.
+      appearance: new Cesium.PerInstanceColorAppearance({ flat: false, translucent: true, closed: true }),
       asynchronous: false,
       // Required so instance attributes stay addressable for re-tinting.
       releaseGeometryInstances: false,
+      // A translucent tile still casts a solid shadow, which is the right call:
+      // the relief is only legible because the sun is low and the ridges throw
+      // long shadows across the board.
       shadows: Cesium.ShadowMode.ENABLED,
     }),
   );
@@ -84,6 +91,23 @@ export function createBoard(scene, frame, map, theatre) {
     clearTint: () => setTinted([]),
     /** The terrain colour a hex returns to, so overlays can blend into it. */
     baseColourAt: (index) => baseColours[index],
+    /**
+     * Change how much of the real ground shows through, live.
+     *
+     * How this reads depends entirely on the imagery underneath, which varies
+     * by theatre and by how built-up the ground happens to be, so it is a
+     * setting rather than a constant. Clears every tint on the way through —
+     * the caller refreshes afterwards and the highlights are recomputed against
+     * the new base colours.
+     */
+    setAlpha: (next) => {
+      for (let i = 0; i < HEX_COUNT; i += 1) {
+        baseColours[i] = terrainColour(map, theatre, i, next);
+        tint(i, null);
+      }
+      tinted = [];
+      scene.requestRender();
+    },
     destroy: () => scene.primitives.remove(primitive),
   };
 }
@@ -94,7 +118,7 @@ export function createBoard(scene, frame, map, theatre) {
  * the board grain, and makes higher ground read as higher even where two
  * neighbours share a type.
  */
-function terrainColour(map, theatre, index) {
+function terrainColour(map, theatre, index, alpha) {
   const base = Cesium.Color.fromCssColorString(theatre.palette[map.terrain[index]]);
   const variation = (map.elevation[index] - 0.5) * 0.22;
   const shade = 1 + variation;
@@ -102,7 +126,7 @@ function terrainColour(map, theatre, index) {
     Math.min(1, base.red * shade),
     Math.min(1, base.green * shade),
     Math.min(1, base.blue * shade),
-    1,
+    alpha,
   );
 }
 

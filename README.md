@@ -150,7 +150,7 @@ from your castle every turn, and you take the enemy keep by encircling and
 starving it before you storm it. There is an AI opponent, three difficulties and
 a rules panel; nothing is fetched from a third party and there is no Ion token.
 
-Four things in it are worth knowing about before editing:
+A few things in it are worth knowing about before editing:
 
 - **The rules are renderer-agnostic on purpose.** `src/model.js` and `src/ai.js`
   import nothing from `view/`, so `scripts/selfplay.mjs` plays whole matches
@@ -177,6 +177,15 @@ Four things in it are worth knowing about before editing:
   zoom band, and to a pitch range, with the globe's own terrain switched off —
   the board is a diorama sitting on the ellipsoid, and real elevation underneath
   would poke through the pieces.
+- **The tiles are translucent**, so the satellite imagery of the real ground
+  shows through the generated board. How well that reads depends on the imagery
+  underneath, so the opacity is a setting rather than a constant. Imagery falls
+  back to the Natural Earth II layer inside Cesium's own static assets when the
+  network blocks ESRI, which needs no off-origin request at all.
+- **Only clicking a column puts it under orders.** Selecting one any other way —
+  Tab, which is also the browser's focus key — shows its readout without
+  lighting the movement range, so a stray keypress and a stray click cannot
+  march an army somewhere you did not intend.
 
 ```bash
 npm run dev marchward                     # play it

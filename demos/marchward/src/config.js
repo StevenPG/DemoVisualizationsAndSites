@@ -28,6 +28,16 @@ export const BOARD = {
 export const RELIEF = {
   exaggeration: 3.2,
   base: 40,
+  /**
+   * Opacity of the terrain tiles.
+   *
+   * Slightly translucent so the satellite imagery of the real ground shows
+   * through the generated board — the point of anchoring the theatre to a
+   * genuine rectangle of the world is rather lost if the board hides it. High
+   * enough that the terrain colours still read as terrain, and that a mountain
+   * in front of a distant tile does not turn into a window.
+   */
+  tileAlpha: 0.76,
   heights: {
     river: 4,
     ford: 14,

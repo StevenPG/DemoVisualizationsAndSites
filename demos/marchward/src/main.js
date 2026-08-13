@@ -9,6 +9,7 @@
 
 import * as Cesium from 'cesium';
 import { createAudio } from './audio.js';
+import { RELIEF } from './config.js';
 import { centreMeters, neighboursOf } from './hex.js';
 import { takeAiTurn } from './ai.js';
 import {
@@ -55,6 +56,7 @@ const SETTINGS_KEY = 'marchward:settings';
 
 const settings = {
   shadows: true,
+  tileAlpha: RELIEF.tileAlpha,
   confirmAttacks: true,
   followAi: true,
   theatre: DEFAULT_THEATRE,
@@ -90,6 +92,15 @@ let session = null;
 
 const ui = {
   selectedId: null,
+  /**
+   * Whether the selected column will take orders from a click on the board.
+   *
+   * Only clicking the column itself arms it. Selecting one any other way —
+   * Tab, which is also the browser's focus key — shows its readout without
+   * lighting up the movement range, so a stray keypress followed by a stray
+   * click can never march an army somewhere you did not intend.
+   */
+  armed: false,
   hoveredHex: null,
   mode: 'select',
   split: { officers: 1, troops: 0 },
@@ -129,7 +140,11 @@ $('small-anyway').addEventListener('click', () => {
 });
 
 function onSettingsChanged() {
-  if (session) setShadows(session.viewer, settings.shadows);
+  if (session) {
+    setShadows(session.viewer, settings.shadows);
+    session.board.setAlpha(settings.tileAlpha);
+    refresh();
+  }
   saveSettings();
 }
 
@@ -174,7 +189,7 @@ async function begin({ theatre, difficulty, seed }) {
   });
   const frame = createFrame(state.theatre);
 
-  const board = createBoard(scene, frame, state.map, state.theatre);
+  const board = createBoard(scene, frame, state.map, state.theatre, { alpha: settings.tileAlpha });
   const castles = createCastles(scene, frame, state.map, state);
   const walls = createWalls(scene, frame, state.map, state);
   const units = createUnits(scene, frame, state.map, state);
@@ -187,6 +202,7 @@ async function begin({ theatre, difficulty, seed }) {
   frameBoard(viewer, frame);
 
   ui.selectedId = null;
+  ui.armed = false;
   ui.mode = 'select';
   ui.hoveredHex = null;
   ui.pendingAttack = null;
@@ -233,7 +249,7 @@ function refresh() {
   castles.rebuild();
   walls.rebuild();
   units.sync({ selectedId: ui.selectedId });
-  board.setTinted(highlightsFor(state, board, { selectedId: ui.selectedId, mode: ui.mode }));
+  board.setTinted(highlightsFor(state, board, { selectedId: ui.selectedId, mode: ui.mode, armed: ui.armed }));
   hud.paint(state, ui);
 }
 
@@ -282,7 +298,7 @@ function previewPath() {
   const { state, orderLine } = session;
   const stack = ui.selectedId === null ? null : state.stacks.get(ui.selectedId);
 
-  if (!stack || stack.side !== 'crown' || ui.mode !== 'select' || ui.hoveredHex === null) {
+  if (!stack || !ui.armed || stack.side !== 'crown' || ui.mode !== 'select' || ui.hoveredHex === null) {
     orderLine.clear();
     return;
   }
@@ -327,12 +343,21 @@ function onClickHex(hex) {
   // Selecting one of your own columns always wins — you can never be trapped
   // in a state where the column you want is unreachable because it is standing
   // somewhere the current selection could attack.
+  //
+  // Clicking it is also the only thing that *arms* it. A column selected any
+  // other way is being looked at, not commanded: clicking a column that is
+  // merely selected arms it rather than deselecting it, and only a click on one
+  // already armed puts it away.
   if (occupant && occupant.side === 'crown') {
-    select(occupant.id === ui.selectedId ? null : occupant.id);
+    if (occupant.id === ui.selectedId && ui.armed) select(null);
+    else select(occupant.id, { armed: true });
     return;
   }
 
-  if (stack && stack.side === 'crown') {
+  // Orders issued by clicking the board need the column armed. Without this,
+  // Tab — which is also the browser's focus key — would arm an army by
+  // accident, and the next click anywhere on the map would march it.
+  if (stack && stack.side === 'crown' && ui.armed) {
     if (tryAttackOrBreach(stack, hex)) return;
     if (tryMove(stack, hex)) return;
   }
@@ -340,8 +365,9 @@ function onClickHex(hex) {
   select(occupant ? occupant.id : null);
 }
 
-function select(id) {
+function select(id, { armed = false } = {}) {
   ui.selectedId = id;
+  ui.armed = id !== null && armed;
   ui.mode = 'select';
   ui.pendingAttack = null;
   if (id !== null) audio.play('select');
@@ -403,12 +429,16 @@ function order(kind, stack) {
   }
   if (kind === 'split') ui.mode = 'split';
   if (kind === 'recruit') ui.mode = 'recruit';
-  if (kind === 'wall') ui.mode = 'wall';
+  if (kind === 'wall') {
+    ui.mode = 'wall';
+    ui.armed = true;
+  }
   refresh();
 }
 
 function armSplit() {
   ui.mode = 'split-place';
+  ui.armed = true;
   refresh();
 }
 
@@ -472,6 +502,7 @@ async function onEndTurn() {
 
   ui.busy = true;
   ui.selectedId = null;
+  ui.armed = false;
   ui.mode = 'select';
   ui.pendingAttack = null;
   session.orderLine.clear();
@@ -573,7 +604,9 @@ function cycleColumns() {
 
   const at = yours.findIndex((stack) => stack.id === ui.selectedId);
   const next = yours[(at + 1) % yours.length];
-  select(next.id);
+  // Deliberately unarmed: Tab finds a column and looks at it, it does not
+  // hand it its orders.
+  select(next.id, { armed: false });
 
   const { x, y } = centreMeters(next.hex);
   lookAt(session.viewer, session.frame, x, y, { duration: 0.5 });
