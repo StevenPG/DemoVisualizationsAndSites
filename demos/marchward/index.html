@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marchward — a medieval siege game on a Cesium globe</title>
+    <meta
+      name="description"
+      content="A turn-based medieval strategy game played on a procedurally generated hex board, rendered as extruded terrain over a real 69 x 45 km rectangle of ground in CesiumJS. Raise officers, march columns, cut supply lines and starve the enemy castle before you storm it."
+    />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#127984;</text></svg>" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <!-- ================= Loading ================= -->
+    <div id="loading" class="loading">
+      <div class="loading-inner">
+        <h2>Marchward</h2>
+        <p id="loading-note">Surveying the ground…</p>
+      </div>
+    </div>
+
+    <!-- ================= Main menu ================= -->
+    <div id="menu" class="screen" hidden>
+      <div class="screen-scroll">
+        <div class="menu-inner">
+          <a class="back" href="/">← all demos</a>
+
+          <header class="title-block">
+            <h1>Marchward</h1>
+            <p class="tagline">
+              Officers lead armies of thousands across sixty-nine kilometres of real ground. Supply is
+              traced from your castle every turn. Surround theirs, starve it, then storm it.
+            </p>
+          </header>
+
+          <section class="setup-block">
+            <h2>Choose your theatre</h2>
+            <div id="theatre-list" class="theatre-list"></div>
+          </section>
+
+          <section class="setup-block">
+            <h2>The opposition</h2>
+            <div id="difficulty-list" class="option-row"></div>
+          </section>
+
+          <section class="setup-block">
+            <h2>Map seed</h2>
+            <p class="hint">
+              The board is generated from this. The same seed and theatre always produce the same
+              ground, so a map worth replaying can be written down.
+            </p>
+            <div class="seed-row">
+              <input id="seed" type="text" spellcheck="false" aria-label="Map seed" />
+              <button id="reseed" type="button" class="ghost">New seed</button>
+            </div>
+          </section>
+
+          <div class="menu-actions">
+            <button id="begin" type="button" class="primary">Take the field</button>
+            <button id="menu-rules" type="button" class="ghost">How it is played</button>
+            <button id="menu-settings" type="button" class="ghost">Settings</button>
+          </div>
+
+          <p class="colophon">
+            Terrain, rivers and castle placement are generated per seed and drawn as extruded hex
+            prisms over a bounded rectangle of the real world. Imagery is keyless ESRI; there is no
+            Cesium Ion token and nothing is fetched from a third party at runtime.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= In-game HUD ================= -->
+    <div id="hud" hidden>
+      <header id="topbar">
+        <div class="topbar-left">
+          <button id="hud-menu" type="button" class="icon-button" title="Menu">☰</button>
+          <div class="turn-block">
+            <span class="turn-number" id="turn-number">Turn 1</span>
+            <span class="turn-side" id="turn-side">The Crown</span>
+          </div>
+        </div>
+        <div id="stat-strip" class="stat-strip"></div>
+        <div class="topbar-right">
+          <button id="hud-rules" type="button" class="icon-button" title="Rules">?</button>
+          <button id="hud-settings" type="button" class="icon-button" title="Settings">⚙</button>
+        </div>
+      </header>
+
+      <aside id="orders" class="panel" aria-label="Orders">
+        <div id="orders-body"></div>
+      </aside>
+
+      <aside id="chronicle" class="panel" aria-label="Chronicle">
+        <h3>Chronicle</h3>
+        <ol id="chronicle-list"></ol>
+      </aside>
+
+      <footer id="turnbar">
+        <p id="prompt" class="prompt"></p>
+        <button id="end-turn" type="button" class="primary">End turn</button>
+      </footer>
+
+      <div id="toast" class="toast" hidden></div>
+    </div>
+
+    <!-- ================= Modals ================= -->
+    <div id="rules" class="modal" hidden>
+      <div class="modal-card">
+        <button class="modal-close" type="button" data-close="rules" aria-label="Close">×</button>
+        <div id="rules-body"></div>
+      </div>
+    </div>
+
+    <div id="settings" class="modal" hidden>
+      <div class="modal-card narrow">
+        <button class="modal-close" type="button" data-close="settings" aria-label="Close">×</button>
+        <h2>Settings</h2>
+        <div id="settings-body"></div>
+      </div>
+    </div>
+
+    <div id="outcome" class="modal" hidden>
+      <div class="modal-card narrow">
+        <h2 id="outcome-title">The campaign is over</h2>
+        <p id="outcome-text"></p>
+        <div id="outcome-stats" class="outcome-stats"></div>
+        <div class="modal-actions">
+          <button id="outcome-again" type="button" class="primary">New campaign</button>
+          <button id="outcome-look" type="button" class="ghost">Look at the board</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="small-screen" class="screen small-screen" hidden>
+      <div class="menu-inner">
+        <h1>Marchward</h1>
+        <p>
+          This one wants a larger screen. The board is sixty-nine kilometres of hex grid with a
+          camera, an orders panel and a chronicle around it, and none of that fits a phone in
+          portrait. Turn a tablet landscape, or come back on a desktop.
+        </p>
+        <button id="small-anyway" type="button" class="ghost">Try it anyway</button>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
