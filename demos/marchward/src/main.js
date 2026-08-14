@@ -34,8 +34,7 @@ import {
 import { wallBlocks } from './supply.js';
 import { DEFAULT_THEATRE } from './theatres.js';
 import { createBoard, createCastles, createWalls } from './view/board.js';
-import { hexCentre, hexHeight } from './view/geo.js';
-import { createFrame } from './view/geo.js';
+import { createFrame, hexCentre, hexHeight } from './view/geo.js';
 import { createOrderLine, createUnits } from './view/units.js';
 import { highlightsFor } from './view/overlay.js';
 import { cageCamera, createViewer, frameBoard, isOnScreen, lookAt, setShadows } from './view/viewer.js';
@@ -59,6 +58,7 @@ const SETTINGS_KEY = 'marchward:settings';
 const settings = {
   shadows: true,
   tileAlpha: RELIEF.tileAlpha,
+  confirmMoves: true,
   confirmAttacks: true,
   followAi: true,
   theatre: DEFAULT_THEATRE,
@@ -109,6 +109,8 @@ const ui = {
   mode: 'select',
   split: { officers: 1, troops: 0 },
   pendingAttack: null,
+  /** A destination armed by a first click, waiting for the second to commit. */
+  pendingMove: null,
   busy: false,
 };
 
@@ -217,6 +219,7 @@ async function begin({ theatre, difficulty, seed }) {
   ui.mode = 'select';
   ui.hoveredHex = null;
   ui.pendingAttack = null;
+  ui.pendingMove = null;
   ui.busy = false;
 
   refresh();
@@ -260,7 +263,16 @@ function refresh() {
   castles.rebuild();
   walls.rebuild();
   units.sync({ selectedId: ui.selectedId });
-  board.setTinted(highlightsFor(state, board, { selectedId: ui.selectedId, mode: ui.mode, armed: ui.armed }));
+  previewPath();
+  board.setTinted(
+    highlightsFor(state, board, {
+      selectedId: ui.selectedId,
+      mode: ui.mode,
+      armed: ui.armed,
+      pendingMove: ui.pendingMove,
+      pendingAttack: ui.pendingAttack,
+    }),
+  );
   hud.paint(state, ui);
 }
 
@@ -309,20 +321,27 @@ function previewPath() {
   const { state, orderLine } = session;
   const stack = ui.selectedId === null ? null : state.stacks.get(ui.selectedId);
 
-  if (!stack || !ui.armed || stack.side !== 'crown' || ui.mode !== 'select' || ui.hoveredHex === null) {
+  if (!stack || !ui.armed || stack.side !== 'crown' || ui.mode !== 'select') {
+    orderLine.clear();
+    return;
+  }
+  if (ui.hoveredHex === null && ui.pendingMove === null) {
     orderLine.clear();
     return;
   }
 
   const field = reachableFrom(state, stack);
   const targets = moveTargets(state, stack, field);
-  if (!targets.has(ui.hoveredHex)) {
+  // Once a destination is armed the line stays on it, so the route you are
+  // about to confirm does not follow the pointer away.
+  const shown = ui.pendingMove !== null && targets.has(ui.pendingMove) ? ui.pendingMove : ui.hoveredHex;
+  if (!targets.has(shown)) {
     orderLine.clear();
     return;
   }
 
   const path = [];
-  for (let at = ui.hoveredHex; at !== -1 && at !== undefined; at = field.get(at)?.from ?? -1) path.unshift(at);
+  for (let at = shown; at !== -1 && at !== undefined; at = field.get(at)?.from ?? -1) path.unshift(at);
   orderLine.show(path, state.sides.crown.colours.light);
 }
 
@@ -400,8 +419,8 @@ function select(id, { armed = false } = {}) {
   ui.armed = id !== null && armed;
   ui.mode = 'select';
   ui.pendingAttack = null;
+  ui.pendingMove = null;
   if (id !== null) audio.play('select');
-  previewPath();
   refresh();
 }
 
@@ -421,7 +440,8 @@ function tryAttackOrBreach(stack, hex) {
   // shows the forecast, the second commits.
   if (settings.confirmAttacks && ui.pendingAttack !== hex) {
     ui.pendingAttack = hex;
-    hud.paint(state, ui);
+    ui.pendingMove = null;
+    refresh();
     audio.play('select');
     return true;
   }
@@ -435,6 +455,19 @@ function tryAttackOrBreach(stack, hex) {
 function tryMove(stack, hex) {
   const { state } = session;
   if (!moveTargets(state, stack).has(hex)) return false;
+
+  // Same two-step as an attack: the first click arms the destination and shows
+  // what the march would cost, the second commits it. Moving is the order you
+  // give most often and the easiest to fire by accident, and there is no undo.
+  if (settings.confirmMoves && ui.pendingMove !== hex) {
+    ui.pendingMove = hex;
+    ui.pendingAttack = null;
+    refresh();
+    audio.play('select');
+    return true;
+  }
+
+  ui.pendingMove = null;
   const before = stack.id;
   const result = apply(moveStack(state, stack.id, hex));
   if (result.ok) {
@@ -454,6 +487,7 @@ function order(kind, stack) {
   if (kind === 'cancel') {
     ui.mode = 'select';
     ui.pendingAttack = null;
+    ui.pendingMove = null;
     refresh();
     return;
   }
@@ -566,6 +600,7 @@ async function onEndTurn() {
   ui.armed = false;
   ui.mode = 'select';
   ui.pendingAttack = null;
+  ui.pendingMove = null;
   session.orderLine.clear();
   audio.play('turn');
 

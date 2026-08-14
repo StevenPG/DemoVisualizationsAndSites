@@ -244,6 +244,15 @@ export function renderSettings({ audio, settings, onChange }) {
   );
 
   toggle(
+    'Confirm marches',
+    'Show what the march costs and require a second click on the destination before a column moves.',
+    () => settings.confirmMoves,
+    (value) => {
+      settings.confirmMoves = value;
+    },
+  );
+
+  toggle(
     'Confirm attacks',
     'Show the forecast and require a second click before committing a column to a fight.',
     () => settings.confirmAttacks,
@@ -343,7 +352,8 @@ export function renderRules() {
     </p>
     <p>
       Two of your columns can be <strong>joined</strong> back together: select one, choose
-      <em>Join another column</em>, and click a friendly column it can reach. It marches onto the
+      <em>Join another column</em>, and click a friendly column standing <strong>right beside
+      it</strong>. It marches onto the
       other and the two become one. Joining is free — only dividing costs an AP — but the combined
       column may hold no more than ${ARMY.maxOfficersPerStack} officers, and it moves at the pace
       its new size allows.
@@ -446,7 +456,7 @@ export function renderRules() {
 
     <h3>Controls</h3>
     <ul>
-      <li><strong>Click</strong> one of your columns to take command of it, then click a highlighted hex to march there. Only clicking a column puts it under orders — until you do, clicking the map cannot move it.</li>
+      <li><strong>Click</strong> one of your columns to take command of it, then click a highlighted hex to march there. Only clicking a column puts it under orders — until you do, clicking the map cannot move it. Marches and attacks both take a second click on the same hex to commit, which you can switch off in Settings.</li>
       <li><strong>Click an enemy</strong> on a red hex to attack it, or the castle to storm it.</li>
       <li><strong>Click any hex</strong> — yours, theirs or empty — to open its details: what the ground costs, what it is worth to defend, whose supply it lies in, how far it is from either castle, and whatever is standing on it.</li>
       <li><strong>Drag</strong> to pan, <strong>scroll</strong> to zoom, <strong>middle-drag</strong> to tilt.</li>

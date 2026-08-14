@@ -13,6 +13,7 @@ import {
   castleOwnerAt,
   forecastAttack,
   mergeTargets,
+  moveTargets,
   movementAllowance,
   recruitCapacity,
   stackAt,
@@ -126,6 +127,7 @@ export function createHud({ actions, audio }) {
       ${ui.mode === 'recruit' ? recruitForm(state, stack) : ''}
       ${ui.mode === 'wall' ? '<p class="empty-note" style="margin-top:0.7rem">Click a hex beside this column to raise a wall along that edge.</p>' : ''}
       ${ui.mode === 'merge' ? '<p class="empty-note" style="margin-top:0.7rem">Click a highlighted friendly column to march this one onto it and join the two.</p>' : ''}
+      ${marchBlock(state, stack, ui)}
       ${forecastBlock(state, stack, ui)}
       ${raiseBlock(state, stack)}
     `;
@@ -255,6 +257,43 @@ export function createHud({ actions, audio }) {
           <button type="button" data-order="cancel">Cancel</button>
           <button type="button" class="primary" data-recruit-confirm>Raise them</button>
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * What the armed march would cost, shown between the two clicks.
+   *
+   * Movement is the order you give most often and the one with no undo, so the
+   * confirmation is worth more than a pause — it is the only moment the game
+   * can tell you what the ground is about to charge you and where the column
+   * will be left standing.
+   */
+  function marchBlock(state, stack, ui) {
+    if (ui.pendingMove === null || ui.pendingMove === undefined) return '';
+    if (stack.side !== 'crown') return '';
+
+    const entry = moveTargets(state, stack).get(ui.pendingMove);
+    if (!entry) return '';
+
+    const terrain = TERRAIN[state.map.terrain[ui.pendingMove]];
+    const left = stack.mp - entry.cost;
+    const adjacentToEnemy = neighboursOf(ui.pendingMove).some((n) => {
+      const other = stackAt(state, n);
+      return other && other.side !== stack.side && other.troops > 0;
+    });
+
+    return `
+      <div class="forecast march">
+        <h4>March order</h4>
+        <div class="line"><span>Onto</span><span>${terrain.label}</span></div>
+        <div class="line"><span>Costs</span><span>${entry.cost} of ${stack.mp} MP</span></div>
+        <div class="line"><span>Left after</span><span>${left} MP</span></div>
+        <p class="verdict">${
+          adjacentToEnemy
+            ? 'This ends the march beside an enemy column — it will be able to attack you before you move again.'
+            : `It would defend there as ${Math.round(stack.troops * terrain.defense).toLocaleString()}.`
+        } <b>Click again to confirm.</b></p>
       </div>
     `;
   }
@@ -550,7 +589,9 @@ export function createHud({ actions, audio }) {
 
     if (ui.mode === 'wall') prompt.textContent = 'Click a hex beside the selected column to wall that edge.';
     else if (ui.mode === 'merge') prompt.textContent = 'Click a highlighted friendly column to join the two together.';
-    else if (ui.selectedId !== null && !ui.armed) {
+    else if (ui.pendingMove !== null && ui.pendingMove !== undefined) {
+      prompt.textContent = 'Click that hex again to march there.';
+    } else if (ui.selectedId !== null && !ui.armed) {
       prompt.textContent = 'Click that column on the map to give it orders.';
     }
     else if (ui.mode === 'split-place') prompt.textContent = 'Click an empty adjacent hex for the detachment.';

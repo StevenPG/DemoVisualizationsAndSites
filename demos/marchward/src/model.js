@@ -239,7 +239,9 @@ export function moveTargets(state, stack, field = reachableFrom(state, stack)) {
 export function mergeTargets(state, stack) {
   const out = new Map();
   for (const [hex, entry] of moveTargets(state, stack)) {
-    if (entry.merge !== undefined) out.set(hex, entry);
+    if (entry.merge === undefined) continue;
+    if (distance(stack.hex, hex) > ARMY.joinRange) continue;
+    out.set(hex, entry);
   }
   return out;
 }

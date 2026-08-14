@@ -105,6 +105,16 @@ export const AP = {
  * one stack move at a crawl.
  */
 export const ARMY = {
+  /**
+   * How far away a column may be and still be joined.
+   *
+   * Adjacent only. Joining is a march onto the other column, so without this it
+   * reached as far as the mover could march — five hexes on good ground — and
+   * two columns on opposite sides of a valley could fuse in a turn. Requiring
+   * them to already be side by side keeps concentrating an army something you
+   * have to spend turns arranging.
+   */
+  joinRange: 1,
   maxTroopsPerOfficer: 6000,
   maxOfficersPerStack: 4,
   maxOfficersPerSide: 8,

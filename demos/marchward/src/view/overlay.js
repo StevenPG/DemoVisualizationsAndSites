@@ -28,13 +28,19 @@ const HIGHLIGHTS = {
   siege: { colour: '#f2c14e', strength: 0.6 },
   wall: { colour: '#cfbaee', strength: 0.62 },
   join: { colour: '#8fd6c2', strength: 0.68 },
+  /** A destination or target armed by a first click, awaiting confirmation. */
+  pending: { colour: '#ffffff', strength: 0.85 },
 };
 
 /**
  * The full set of tints for the current selection, as
  * `{ index, colour }` entries ready for the board's setTinted.
  */
-export function highlightsFor(state, board, { selectedId, mode, armed = false }) {
+export function highlightsFor(
+  state,
+  board,
+  { selectedId, mode, armed = false, pendingMove = null, pendingAttack = null },
+) {
   const entries = [];
   const stack = selectedId === null ? null : state.stacks.get(selectedId);
   if (!stack) return entries;
@@ -97,6 +103,12 @@ export function highlightsFor(state, board, { selectedId, mode, armed = false })
   }
 
   push(stack.hex, 'selected');
+
+  // Whatever is waiting on a second click goes on last and brightest, so the
+  // hex about to be committed to is unmistakable among the ones merely offered.
+  if (pendingMove !== null) push(pendingMove, 'pending');
+  if (pendingAttack !== null) push(pendingAttack, 'pending');
+
   return entries;
 }
 
