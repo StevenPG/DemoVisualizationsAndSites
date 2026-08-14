@@ -48,8 +48,13 @@ import { computeSupply, otherSide, wallBlocks } from './supply.js';
  * Yielding each action lets the interface play them out at a human pace and
  * point the camera at each one, so you can watch what was done to you and why.
  *
- * Each step carries the hex worth looking at and how long it deserves — a levy
- * raised at the castle is not worth the same pause as an assault.
+ * Each step carries the hex worth looking at, how long it deserves, and a
+ * `commit` that actually performs it. The decision is made when the step is
+ * yielded but the mutation waits for the caller, which is what lets the camera
+ * travel to the spot *before* anything happens there — otherwise the board has
+ * already changed by the time you are looking at it, and every move is seen in
+ * hindsight. A levy raised at the castle is not worth the same pause as an
+ * assault, hence the pace.
  */
 export function* aiTurnSteps(state, sideKey = AI_SIDE) {
   if (state.status !== 'playing' || state.activeSide !== sideKey) return;
@@ -64,7 +69,10 @@ export function* aiTurnSteps(state, sideKey = AI_SIDE) {
 /** Runs a whole turn at once. Used by the headless harness, and when the player turns playback off. */
 export function takeAiTurn(state, sideKey = AI_SIDE) {
   const events = [];
-  for (const step of aiTurnSteps(state, sideKey)) events.push(...step.events);
+  for (const step of aiTurnSteps(state, sideKey)) {
+    const result = step.commit();
+    if (result?.ok) events.push(...result.events);
+  }
   return events;
 }
 
@@ -159,8 +167,7 @@ function* raiseForces(state, plan) {
     (!mustering || (mustering.side === plan.sideKey && mustering.officers < ARMY.maxOfficersPerStack)) &&
     spendable() >= AP.spawnOfficer + Math.min(canFill, 3)
   ) {
-    const result = spawnOfficer(state, plan.sideKey);
-    if (result.ok) yield { events: result.events, focus: me.castle, pace: 'muster' };
+    yield { focus: me.castle, pace: 'muster', commit: () => spawnOfficer(state, plan.sideKey) };
   }
 
   const atCastle = stackAt(state, me.castle);
@@ -169,8 +176,7 @@ function* raiseForces(state, plan) {
     const affordable = Math.floor(spendable() / AP.recruitPerThousand) * 1000;
     const wanted = Math.min(room, affordable);
     if (wanted >= ARMY.recruitStep) {
-      const result = recruit(state, atCastle.id, wanted);
-      if (result.ok) yield { events: result.events, focus: me.castle, pace: 'muster' };
+      yield { focus: me.castle, pace: 'muster', commit: () => recruit(state, atCastle.id, wanted) };
     }
   }
 }
@@ -193,9 +199,12 @@ function* manoeuvre(state, plan) {
     const role = defenders.has(stack.id) ? 'defend' : 'besiege';
     const destination = chooseDestination(state, plan, stack, role);
     if (destination === null || destination === stack.hex) continue;
-    const from = stack.hex;
-    const result = moveStack(state, stack.id, destination);
-    if (result.ok) yield { events: result.events, focus: destination, from, pace: 'march' };
+    yield {
+      focus: destination,
+      from: stack.hex,
+      pace: 'march',
+      commit: () => moveStack(state, stack.id, destination),
+    };
   }
 }
 
@@ -361,13 +370,17 @@ function* prosecuteAttacks(state, plan) {
     const best = bestTargetFor(state, plan, stack);
     if (!best) continue;
 
-    const result =
-      best.kind === 'castle'
-        ? assaultCastle(state, stack.id)
-        : best.kind === 'wall'
-          ? breachWall(state, stack.id, best.hex)
-          : attack(state, stack.id, best.hex);
-    if (result.ok) yield { events: result.events, focus: best.hex, pace: 'fight' };
+    yield {
+      focus: best.hex,
+      from: stack.hex,
+      pace: 'fight',
+      commit: () =>
+        best.kind === 'castle'
+          ? assaultCastle(state, stack.id)
+          : best.kind === 'wall'
+            ? breachWall(state, stack.id, best.hex)
+            : attack(state, stack.id, best.hex),
+    };
   }
 }
 
@@ -464,6 +477,9 @@ function* fortify(state, plan) {
 
   if (!best || best.severed < 6) return;
 
-  const result = buildWall(state, plan.sideKey, best.from, best.to);
-  if (result.ok) yield { events: result.events, focus: best.from, pace: 'march' };
+  yield {
+    focus: best.from,
+    pace: 'march',
+    commit: () => buildWall(state, plan.sideKey, best.from, best.to),
+  };
 }

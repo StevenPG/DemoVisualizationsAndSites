@@ -618,6 +618,7 @@ async function onEndTurn() {
     playEvents(endTurn(state).events);
     refresh();
     audio.play('turn');
+    await returnToCapital();
   }
 
   ui.busy = false;
@@ -625,23 +626,32 @@ async function onEndTurn() {
   checkFinished();
 }
 
-/** How long each kind of enemy action is left on screen before the next one. */
+/**
+ * The beats of an enemy action, in milliseconds.
+ *
+ * Split into travel, a pause before, and a pause after, because those are three
+ * different jobs: the camera has to get there, the eye has to arrive before the
+ * thing happens, and the result has to stay up long enough to be read. Fights
+ * get the longest tail — a levy raised at a castle is not worth the same beat as
+ * an assault on one.
+ */
 const PACING = {
-  muster: 420,
-  march: 620,
-  fight: 1100,
+  cameraFlight: 520,
+  beforeAction: 240,
+  after: { muster: 320, march: 560, fight: 1150 },
 };
 
 /**
- * Plays the opponent's turn out one action at a time, following the camera.
+ * Plays the opponent's turn out one action at a time, camera first.
  *
- * The whole turn still resolves through exactly the same functions; the only
- * difference is that the interface stops between them. That is what turns "the
- * board is now different" into something you can actually read — you see which
- * column moved where, and the fight that followed, in the order they happened.
+ * The order matters and it is the whole point: travel to the hex, let it
+ * settle, *then* commit the action, then hold. Showing the result and panning
+ * afterwards means every move is seen in hindsight — you arrive to find a
+ * column already somewhere else and have to work backwards. Leading with the
+ * camera means you are looking at the right patch of ground when it happens.
  *
- * The camera only moves when the action is not already on screen, because
- * flying to every step would leave the board lurching for the whole turn.
+ * The camera only travels when the action is not already comfortably in frame,
+ * since flying to something already under the player's nose reads as a twitch.
  */
 async function playEnemyTurn() {
   const { state, viewer, frame } = session;
@@ -654,28 +664,49 @@ async function playEnemyTurn() {
   }
 
   for (const step of aiTurnSteps(state)) {
-    playEvents(step.events);
-    refresh();
-
-    const headline = step.events.find((event) => event.text)?.text;
-    if (headline) $('prompt').textContent = headline;
-
     if (step.focus !== undefined && step.focus !== null) {
       const target = hexCentre(frame, step.focus, hexHeight(map, step.focus));
-      // A column that marched from off-screen is worth following even if where
-      // it landed happens to be in view already.
+      // A column marching in from off-screen is worth following even when the
+      // hex it arrives on is already in view.
       const cameFromOffScreen =
         step.from !== undefined && !isOnScreen(viewer, hexCentre(frame, step.from, hexHeight(map, step.from)));
-      if (!isOnScreen(viewer, target) || cameFromOffScreen) {
+
+      if (!isOnScreen(viewer, target, 0.26) || cameFromOffScreen) {
         const { x, y } = centreMeters(step.focus);
-        lookAt(viewer, frame, x, y, { duration: 0.6 });
-        await pause(680);
+        lookAt(viewer, frame, x, y, { duration: 0.55 });
+        await pause(PACING.cameraFlight);
       }
+      await pause(PACING.beforeAction);
     }
 
-    await pause(PACING[step.pace] ?? 600);
+    const result = step.commit();
+    if (!result?.ok) continue;
+
+    playEvents(result.events);
+    refresh();
+    const headline = result.events.find((event) => event.text)?.text;
+    if (headline) $('prompt').textContent = headline;
+
+    await pause(PACING.after[step.pace] ?? 620);
     if (state.status !== 'playing') return;
   }
+}
+
+/**
+ * Bring the view home when the turn comes back to you.
+ *
+ * After watching the opponent, the camera is left wherever their last order
+ * happened — which is a different place every turn and usually not one of
+ * yours. Returning to your own castle gives every turn the same opening frame.
+ * Skipped when playback is off, since then the camera never moved and hauling
+ * it away from wherever you left it would be the annoyance rather than the fix.
+ */
+async function returnToCapital() {
+  if (!settings.followAi || !session) return;
+  const { state, viewer, frame } = session;
+  const { x, y } = centreMeters(state.sides.crown.castle);
+  lookAt(viewer, frame, x, y, { duration: 0.9 });
+  await pause(560);
 }
 
 function checkFinished() {

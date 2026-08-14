@@ -459,7 +459,7 @@ export function createHud({ actions, audio }) {
     ];
 
     let html = `
-      <div class="inspect-head">${castle ? `${state.sides[castle].name}’ castle` : terrain.label}</div>
+      <div class="inspect-head">${castle ? `${possessive(state.sides[castle].name)} castle` : terrain.label}</div>
       <div class="inspect-where">Column ${col + 1}, row ${row + 1} · ${km(1)} across</div>
       <dl class="readout">
         ${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}
@@ -530,6 +530,9 @@ export function createHud({ actions, audio }) {
 
     $('inspector-body').innerHTML = html;
   }
+
+  /** "The Crown" takes an apostrophe-s; "The Marcher Lords" takes the apostrophe alone. */
+  const possessive = (name) => (name.endsWith('s') ? `${name}\u2019` : `${name}\u2019s`);
 
   /** One sentence on why this ground matters, so the terrain table is learnable in play. */
   function terrainNote(terrain) {
