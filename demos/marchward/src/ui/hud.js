@@ -8,7 +8,7 @@
  * would make a legible game feel like a gamble.
  */
 
-import { AP, ARMY, MATCH, SIEGE, TERRAIN, WALLS } from '../config.js';
+import { AP, ARMY, BOARD, MATCH, SIEGE, TERRAIN, WALLS } from '../config.js';
 import {
   castleOwnerAt,
   forecastAttack,
@@ -19,7 +19,7 @@ import {
   stackCapacity,
   summarise,
 } from '../model.js';
-import { neighboursOf } from '../hex.js';
+import { distance, edgeKey, neighboursOf } from '../hex.js';
 import { columnIcon } from '../view/icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -370,6 +370,151 @@ export function createHud({ actions, audio }) {
   }
 
   // ------------------------------------------------------------------
+  // Inspector — everything true about one hex
+  // ------------------------------------------------------------------
+
+  /**
+   * What is on the hex the player last clicked.
+   *
+   * This is the game's only teaching surface that costs the player nothing to
+   * use: the rules panel explains the systems in the abstract, and this shows
+   * them acting on one specific piece of ground. Every number here is read live
+   * off the model rather than described, so what it says is what the rules will
+   * do.
+   */
+  function paintInspector(state, ui) {
+    const panel = $('inspector');
+    if (ui.inspectHex === null || ui.inspectHex === undefined) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+
+    const hex = ui.inspectHex;
+    const terrain = TERRAIN[state.map.terrain[hex]];
+    const occupant = stackAt(state, hex);
+    const castle = castleOwnerAt(state, hex);
+    const col = hex % BOARD.cols;
+    const row = Math.floor(hex / BOARD.cols);
+
+    const km = (hexes) => `${(hexes * BOARD.hexSpacingMeters) / 1000} km`;
+    const toYours = distance(hex, state.sides.crown.castle);
+    const toTheirs = distance(hex, state.sides.marcher.castle);
+
+    const supply = state.sides.crown.supplied.has(hex)
+      ? '<span style="color:var(--good)">yours</span>'
+      : state.sides.marcher.supplied.has(hex)
+        ? '<span style="color:var(--marcher)">Marcher</span>'
+        : 'contested';
+
+    const walls = neighboursOf(hex)
+      .map((n) => state.walls.get(edgeKey(hex, n)))
+      .filter(Boolean);
+
+    const rows = [
+      ['Movement cost', terrain.passable ? `${terrain.move} MP to enter` : 'impassable'],
+      ['Defence', terrain.passable ? `${terrain.defense >= 1 ? '+' : ''}${Math.round((terrain.defense - 1) * 100)}%` : '—'],
+      ['Supply', supply],
+      ['From your castle', `${toYours} hexes · ${km(toYours)}`],
+      ['From theirs', `${toTheirs} hexes · ${km(toTheirs)}`],
+    ];
+
+    let html = `
+      <div class="inspect-head">${castle ? `${state.sides[castle].name}’ castle` : terrain.label}</div>
+      <div class="inspect-where">Column ${col + 1}, row ${row + 1} · ${km(1)} across</div>
+      <dl class="readout">
+        ${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}
+      </dl>
+      <p class="inspect-note">${terrainNote(terrain)}</p>
+    `;
+
+    if (castle) {
+      const side = state.sides[castle];
+      const ring = neighboursOf(side.castle);
+      const besiegers = ring.filter((r) => {
+        const o = stackAt(state, r);
+        return o && o.side !== castle && o.troops > 0;
+      }).length;
+      html += `
+        <div class="inspect-section">
+          <h4 class="${castle}">${side.name}</h4>
+          <dl class="readout">
+            <dt>Garrison</dt><dd>${Math.round(side.garrison).toLocaleString()}</dd>
+            <dt>Wall rating</dt><dd>×${side.wallRating.toFixed(2)}</dd>
+            <dt>Worth in a fight</dt><dd>${Math.round(side.garrison * side.wallRating).toLocaleString()}</dd>
+            <dt>Ring held</dt><dd class="${besiegers ? 'warn' : ''}">${besiegers} of ${ring.length}</dd>
+          </dl>
+          <p class="inspect-note">${
+            besiegers
+              ? `Losing ${Math.round(besiegers * SIEGE.drainPerRingHex * (1 + SIEGE.encirclementBonus * (besiegers - 1))).toLocaleString()} a turn to starvation.`
+              : `Unbesieged, so it recovers ${SIEGE.regenPerTurn} a turn.`
+          }</p>
+        </div>
+      `;
+    }
+
+    if (occupant) {
+      const side = state.sides[occupant.side];
+      html += `
+        <div class="inspect-section">
+          <h4 class="${occupant.side}">${occupant.side === 'crown' ? 'Your column' : 'Marcher column'}</h4>
+          <dl class="readout">
+            <dt>Officers</dt><dd>${occupant.officers} of ${ARMY.maxOfficersPerStack}</dd>
+            <dt>Troops</dt><dd>${occupant.troops.toLocaleString()} / ${stackCapacity(occupant).toLocaleString()}</dd>
+            <dt>Marches</dt><dd>${movementAllowance(occupant)} MP a turn</dd>
+            <dt>Supply</dt><dd class="${occupant.supplied ? '' : 'warn'}">${occupant.supplied ? 'traced' : 'CUT OFF'}</dd>
+          </dl>
+          <p class="inspect-note">${
+            occupant.supplied
+              ? `Defending here it counts as ${Math.round(occupant.troops * terrain.defense).toLocaleString()}.`
+              : 'Cut off from its castle: it loses men every turn and cannot be reinforced.'
+          }</p>
+        </div>
+      `;
+    }
+
+    if (walls.length) {
+      html += `
+        <div class="inspect-section">
+          <h4>Walls on this hex</h4>
+          <p class="inspect-note">${walls
+            .map(
+              (wall) =>
+                `${state.sides[wall.side].name}, ${wall.integrity} of ${WALLS.integrity} intact — ${
+                  wall.side === 'crown' ? 'yours, so you pass freely.' : 'it blocks your movement and supply until breached.'
+                }`,
+            )
+            .join('<br>')}</p>
+        </div>
+      `;
+    }
+
+    $('inspector-body').innerHTML = html;
+  }
+
+  /** One sentence on why this ground matters, so the terrain table is learnable in play. */
+  function terrainNote(terrain) {
+    switch (terrain.key) {
+      case 'plains':
+        return 'Open farmland. The fastest going on the board and the worst place to be caught.';
+      case 'rough':
+        return 'Broken stony ground. Slow to cross, and a little easier to hold than open field.';
+      case 'forest':
+        return 'Woodland. Slow, and it shelters whoever is standing in it.';
+      case 'hills':
+        return 'High ground — the best defensive terrain there is, and expensive to climb.';
+      case 'ford':
+        return 'A shallow crossing: the only way over a river. Costly to enter and bad ground to be attacked on, which is what makes holding one worth doing.';
+      case 'river':
+        return 'Impassable. Armies cross at fords, so the fords are what both sides are racing for.';
+      case 'mountain':
+        return 'Impassable. A range like this anchors a flank — nothing can come round it.';
+      default:
+        return '';
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Chronicle, prompt, toast
   // ------------------------------------------------------------------
 
@@ -439,6 +584,7 @@ export function createHud({ actions, audio }) {
     paint(state, ui) {
       paintTop(state);
       paintOrders(state, ui);
+      paintInspector(state, ui);
       paintChronicle(state);
       paintPrompt(state, ui);
     },

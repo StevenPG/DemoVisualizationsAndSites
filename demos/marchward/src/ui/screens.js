@@ -253,8 +253,8 @@ export function renderSettings({ audio, settings, onChange }) {
   );
 
   toggle(
-    'Centre the camera on the enemy turn',
-    'Follow what the Marcher Lords do instead of holding your own view.',
+    'Watch the enemy turn',
+    'Play the Marcher Lords\u2019 turn out one order at a time, following the camera, instead of resolving it all at once.',
     () => settings.followAi,
     (value) => {
       settings.followAi = value;
@@ -322,6 +322,17 @@ export function renderRules() {
       </div>
     </div>
 
+    <h3>Raising forces</h3>
+    <p>
+      Everything you field is bought with AP at your castle. <strong>Raise an officer</strong> for
+      ${AP.spawnOfficer} AP — he musters into whatever column is standing on the castle, or forms a
+      new one if it is empty — then <strong>levy troops</strong> into that column at
+      ${AP.recruitPerThousand} AP per thousand. You may field ${ARMY.maxOfficersPerSide} officers in
+      total, no more than ${ARMY.maxOfficersPerStack} in one column, and one officer leads at most
+      ${ARMY.maxTroopsPerOfficer.toLocaleString()} men. A castle that has been cut off from its own
+      supply cannot raise anyone at all.
+    </p>
+
     <h3>Marching</h3>
     <p>
       A column gets ${MOVEMENT.baseAllowance} movement points, less one for every
@@ -369,6 +380,22 @@ export function renderRules() {
       without ever fighting it, and the AI is looking for exactly that move against you.
     </p>
 
+    <h3>Walls</h3>
+    <p>
+      A wall is raised on the <em>edge</em> between two hexes, not on a hex: select a column, choose
+      <em>Raise a wall</em>, and click one of the six hexes beside it. It costs ${AP.buildWall} AP
+      and you may hold ${WALLS.maxSegmentsPerSide} segments at once, so walls are for closing one
+      line rather than fencing off the map.
+    </p>
+    <p>
+      Your own walls have gates and do not slow you down. The enemy's block both
+      <strong>movement</strong> and <strong>supply</strong> across that edge, which is what makes
+      them worth the AP: a segment across the right gap severs a supply line as surely as an army
+      standing there, and it does not have to be fed. Breaching one costs ${AP.breachWall} AP and
+      ends that column's turn, and a wall takes ${WALLS.integrity} turns of work to open — so a wall
+      does not stop an army, it costs the army the time you needed.
+    </p>
+
     <h3>The siege</h3>
     <p>
       A castle starts with ${SIEGE.garrisonStart.toLocaleString()} defenders behind walls rated
@@ -399,6 +426,15 @@ export function renderRules() {
       repeatedly does work — it simply costs far more than starving them first.
     </p>
 
+    <h3>If the season runs out</h3>
+    <p>
+      A campaign that reaches turn ${MATCH.turnLimit} undecided is called on the position: supplied
+      territory counts most, then the damage each side has done to the other's garrison, then troops
+      still in the field and the strength of your own castle. A besieger who has all but taken the
+      keep wins that decision — otherwise the correct play would be to sit still, and a game where
+      sitting still is correct is not worth playing.
+    </p>
+
     <h3>Action points</h3>
     <p>
       AP does not carry over. A turn's income is a turn's worth of decisions.
@@ -412,6 +448,7 @@ export function renderRules() {
     <ul>
       <li><strong>Click</strong> one of your columns to take command of it, then click a highlighted hex to march there. Only clicking a column puts it under orders — until you do, clicking the map cannot move it.</li>
       <li><strong>Click an enemy</strong> on a red hex to attack it, or the castle to storm it.</li>
+      <li><strong>Click any hex</strong> — yours, theirs or empty — to open its details: what the ground costs, what it is worth to defend, whose supply it lies in, how far it is from either castle, and whatever is standing on it.</li>
       <li><strong>Drag</strong> to pan, <strong>scroll</strong> to zoom, <strong>middle-drag</strong> to tilt.</li>
       <li><strong>Space</strong> ends your turn. <strong>Tab</strong> looks through the columns that still have moves left, without putting them under orders. <strong>Escape</strong> clears the selection.</li>
     </ul>

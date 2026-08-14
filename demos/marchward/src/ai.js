@@ -39,15 +39,32 @@ import {
 } from './model.js';
 import { computeSupply, otherSide, wallBlocks } from './supply.js';
 
-export function takeAiTurn(state, sideKey = AI_SIDE) {
-  if (state.status !== 'playing' || state.activeSide !== sideKey) return [];
+/**
+ * The opponent's turn, one action at a time.
+ *
+ * A generator rather than a function that just does everything, because a turn
+ * that resolves in a single frame reads as the board teleporting: five columns
+ * move, three battles happen, and all the player sees is the after state.
+ * Yielding each action lets the interface play them out at a human pace and
+ * point the camera at each one, so you can watch what was done to you and why.
+ *
+ * Each step carries the hex worth looking at and how long it deserves — a levy
+ * raised at the castle is not worth the same pause as an assault.
+ */
+export function* aiTurnSteps(state, sideKey = AI_SIDE) {
+  if (state.status !== 'playing' || state.activeSide !== sideKey) return;
 
   const plan = assess(state, sideKey);
+  yield* raiseForces(state, plan);
+  yield* manoeuvre(state, plan);
+  yield* prosecuteAttacks(state, plan);
+  yield* fortify(state, plan);
+}
+
+/** Runs a whole turn at once. Used by the headless harness, and when the player turns playback off. */
+export function takeAiTurn(state, sideKey = AI_SIDE) {
   const events = [];
-  events.push(...raiseForces(state, plan));
-  events.push(...manoeuvre(state, plan));
-  events.push(...prosecuteAttacks(state, plan));
-  events.push(...fortify(state, plan));
+  for (const step of aiTurnSteps(state, sideKey)) events.push(...step.events);
   return events;
 }
 
@@ -129,9 +146,8 @@ function nearContact(state, sideKey, enemyKey) {
 // Phase 1 — raising forces
 // --------------------------------------------------------------------------
 
-function raiseForces(state, plan) {
+function* raiseForces(state, plan) {
   const me = plan.me;
-  const events = [];
   const spendable = () => me.ap - plan.attackReserve;
 
   // An officer with no troops is a wasted four AP, so raise one only when the
@@ -144,7 +160,7 @@ function raiseForces(state, plan) {
     spendable() >= AP.spawnOfficer + Math.min(canFill, 3)
   ) {
     const result = spawnOfficer(state, plan.sideKey);
-    if (result.ok) events.push(...result.events);
+    if (result.ok) yield { events: result.events, focus: me.castle, pace: 'muster' };
   }
 
   const atCastle = stackAt(state, me.castle);
@@ -154,19 +170,16 @@ function raiseForces(state, plan) {
     const wanted = Math.min(room, affordable);
     if (wanted >= ARMY.recruitStep) {
       const result = recruit(state, atCastle.id, wanted);
-      if (result.ok) events.push(...result.events);
+      if (result.ok) yield { events: result.events, focus: me.castle, pace: 'muster' };
     }
   }
-
-  return events;
 }
 
 // --------------------------------------------------------------------------
 // Phase 2 — manoeuvre
 // --------------------------------------------------------------------------
 
-function manoeuvre(state, plan) {
-  const events = [];
+function* manoeuvre(state, plan) {
   // Biggest columns move first: they are the slowest and the most constrained,
   // and letting a light detachment take the hex a host needed is how an AI ends
   // up shuffling in place.
@@ -180,11 +193,10 @@ function manoeuvre(state, plan) {
     const role = defenders.has(stack.id) ? 'defend' : 'besiege';
     const destination = chooseDestination(state, plan, stack, role);
     if (destination === null || destination === stack.hex) continue;
+    const from = stack.hex;
     const result = moveStack(state, stack.id, destination);
-    if (result.ok) events.push(...result.events);
+    if (result.ok) yield { events: result.events, focus: destination, from, pace: 'march' };
   }
-
-  return events;
 }
 
 /**
@@ -341,9 +353,7 @@ function severanceBonus(state, plan, stack, hex) {
 // Phase 3 — attacks
 // --------------------------------------------------------------------------
 
-function prosecuteAttacks(state, plan) {
-  const events = [];
-
+function* prosecuteAttacks(state, plan) {
   for (const stack of stacksOf(state, plan.sideKey)) {
     if (stack.attacked || stack.troops <= 0) continue;
     if (state.sides[plan.sideKey].ap < AP.attack) break;
@@ -357,10 +367,8 @@ function prosecuteAttacks(state, plan) {
         : best.kind === 'wall'
           ? breachWall(state, stack.id, best.hex)
           : attack(state, stack.id, best.hex);
-    if (result.ok) events.push(...result.events);
+    if (result.ok) yield { events: result.events, focus: best.hex, pace: 'fight' };
   }
-
-  return events;
 }
 
 function bestTargetFor(state, plan, stack) {
@@ -431,9 +439,9 @@ function bestTargetFor(state, plan, stack) {
  * the three AP — which in practice means walling the last gap of an
  * encirclement, or closing a ford behind a raiding column.
  */
-function fortify(state, plan) {
+function* fortify(state, plan) {
   const me = state.sides[plan.sideKey];
-  if (me.ap < AP.buildWall || me.wallsBuilt >= WALLS.maxSegmentsPerSide) return [];
+  if (me.ap < AP.buildWall || me.wallsBuilt >= WALLS.maxSegmentsPerSide) return;
 
   const before = plan.enemySupplied.size;
   let best = null;
@@ -454,8 +462,8 @@ function fortify(state, plan) {
     if (severed > 0 && (!best || severed > best.severed)) best = { ...option, severed };
   }
 
-  if (!best || best.severed < 6) return [];
+  if (!best || best.severed < 6) return;
 
   const result = buildWall(state, plan.sideKey, best.from, best.to);
-  return result.ok ? result.events : [];
+  if (result.ok) yield { events: result.events, focus: best.from, pace: 'march' };
 }

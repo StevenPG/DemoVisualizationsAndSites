@@ -11,7 +11,7 @@ import * as Cesium from 'cesium';
 import { createAudio } from './audio.js';
 import { RELIEF } from './config.js';
 import { centreMeters, neighboursOf } from './hex.js';
-import { takeAiTurn } from './ai.js';
+import { aiTurnSteps, takeAiTurn } from './ai.js';
 import {
   assaultCastle,
   attack,
@@ -34,10 +34,11 @@ import {
 import { wallBlocks } from './supply.js';
 import { DEFAULT_THEATRE } from './theatres.js';
 import { createBoard, createCastles, createWalls } from './view/board.js';
+import { hexCentre, hexHeight } from './view/geo.js';
 import { createFrame } from './view/geo.js';
 import { createOrderLine, createUnits } from './view/units.js';
 import { highlightsFor } from './view/overlay.js';
-import { cageCamera, createViewer, frameBoard, lookAt, setShadows } from './view/viewer.js';
+import { cageCamera, createViewer, frameBoard, isOnScreen, lookAt, setShadows } from './view/viewer.js';
 import { createHud } from './ui/hud.js';
 import {
   createMenu,
@@ -102,6 +103,8 @@ const ui = {
    * click can never march an army somewhere you did not intend.
    */
   armed: false,
+  /** The hex whose details are showing. Set by any click on the board. */
+  inspectHex: null,
   hoveredHex: null,
   mode: 'select',
   split: { officers: 1, troops: 0 },
@@ -138,6 +141,12 @@ $('end-turn').addEventListener('click', onEndTurn);
 
 $('small-anyway').addEventListener('click', () => {
   $('small-screen').hidden = true;
+});
+
+$('inspector-close').addEventListener('click', () => {
+  ui.inspectHex = null;
+  audio.play('click');
+  refresh();
 });
 
 function onSettingsChanged() {
@@ -204,6 +213,7 @@ async function begin({ theatre, difficulty, seed }) {
 
   ui.selectedId = null;
   ui.armed = false;
+  ui.inspectHex = null;
   ui.mode = 'select';
   ui.hoveredHex = null;
   ui.pendingAttack = null;
@@ -324,8 +334,17 @@ function previewPath() {
  */
 function onClickHex(hex) {
   const { state } = session;
-  if (state.status !== 'playing' || ui.busy) return;
-  if (state.activeSide !== 'crown') return;
+  if (ui.busy) return;
+
+  // Inspecting is free and always available — during the enemy's turn, after
+  // the campaign has ended, and on ground you have no business being on. It is
+  // how the player learns what any of this means.
+  ui.inspectHex = hex;
+
+  if (state.status !== 'playing' || state.activeSide !== 'crown') {
+    refresh();
+    return;
+  }
 
   const stack = ui.selectedId === null ? null : state.stacks.get(ui.selectedId);
 
@@ -555,11 +574,8 @@ async function onEndTurn() {
   refresh();
 
   if (state.status === 'playing') {
-    await pause(600);
-    const events = takeAiTurn(state);
-    playEvents(events);
-    refresh();
-    await showAiHighlight(events);
+    await pause(500);
+    await playEnemyTurn();
   }
 
   if (state.status === 'playing') {
@@ -574,22 +590,57 @@ async function onEndTurn() {
   checkFinished();
 }
 
-/**
- * Points the camera at the most consequential thing the opponent just did, so a
- * turn that happened off-screen is not simply a change of numbers in the
- * chronicle.
- */
-async function showAiHighlight(events) {
-  if (!settings.followAi) return;
-  const rank = { assault: 4, siege: 3, battle: 2, breach: 2, wall: 1 };
-  const best = events
-    .filter((event) => event.hex !== null && event.hex !== undefined && rank[event.kind])
-    .sort((a, b) => rank[b.kind] - rank[a.kind])[0];
-  if (!best) return;
+/** How long each kind of enemy action is left on screen before the next one. */
+const PACING = {
+  muster: 420,
+  march: 620,
+  fight: 1100,
+};
 
-  const { x, y } = centreMeters(best.hex);
-  lookAt(session.viewer, session.frame, x, y, { duration: 0.8 });
-  await pause(950);
+/**
+ * Plays the opponent's turn out one action at a time, following the camera.
+ *
+ * The whole turn still resolves through exactly the same functions; the only
+ * difference is that the interface stops between them. That is what turns "the
+ * board is now different" into something you can actually read — you see which
+ * column moved where, and the fight that followed, in the order they happened.
+ *
+ * The camera only moves when the action is not already on screen, because
+ * flying to every step would leave the board lurching for the whole turn.
+ */
+async function playEnemyTurn() {
+  const { state, viewer, frame } = session;
+  const map = state.map;
+
+  if (!settings.followAi) {
+    playEvents(takeAiTurn(state));
+    refresh();
+    return;
+  }
+
+  for (const step of aiTurnSteps(state)) {
+    playEvents(step.events);
+    refresh();
+
+    const headline = step.events.find((event) => event.text)?.text;
+    if (headline) $('prompt').textContent = headline;
+
+    if (step.focus !== undefined && step.focus !== null) {
+      const target = hexCentre(frame, step.focus, hexHeight(map, step.focus));
+      // A column that marched from off-screen is worth following even if where
+      // it landed happens to be in view already.
+      const cameFromOffScreen =
+        step.from !== undefined && !isOnScreen(viewer, hexCentre(frame, step.from, hexHeight(map, step.from)));
+      if (!isOnScreen(viewer, target) || cameFromOffScreen) {
+        const { x, y } = centreMeters(step.focus);
+        lookAt(viewer, frame, x, y, { duration: 0.6 });
+        await pause(680);
+      }
+    }
+
+    await pause(PACING[step.pace] ?? 600);
+    if (state.status !== 'playing') return;
+  }
 }
 
 function checkFinished() {
@@ -614,7 +665,8 @@ function onKey(event) {
   const { state } = session;
 
   if (event.key === 'Escape') {
-    if (ui.mode !== 'select' || ui.selectedId !== null) {
+    if (ui.mode !== 'select' || ui.selectedId !== null || ui.inspectHex !== null) {
+      ui.inspectHex = null;
       select(null);
       event.preventDefault();
     }
@@ -649,6 +701,8 @@ function cycleColumns() {
   // Deliberately unarmed: Tab finds a column and looks at it, it does not
   // hand it its orders.
   select(next.id, { armed: false });
+  ui.inspectHex = next.hex;
+  refresh();
 
   const { x, y } = centreMeters(next.hex);
   lookAt(session.viewer, session.frame, x, y, { duration: 0.5 });

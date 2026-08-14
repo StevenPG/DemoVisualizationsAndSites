@@ -217,6 +217,25 @@ export function frameBoard(viewer, frame, { duration = 0 } = {}) {
   });
 }
 
+/**
+ * True when a world position is comfortably inside the viewport.
+ *
+ * Used to decide whether an enemy action needs the camera moved at all. Flying
+ * to every single one would leave the board lurching about for a whole turn;
+ * most of what happens is already on screen, and only the parts that are not
+ * are worth a pan.
+ */
+export function isOnScreen(viewer, position, insetFraction = 0.18) {
+  const window = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, position);
+  if (!window) return false;
+  const { clientWidth: width, clientHeight: height } = viewer.scene.canvas;
+  const insetX = width * insetFraction;
+  const insetY = height * insetFraction;
+  return (
+    window.x > insetX && window.x < width - insetX && window.y > insetY && window.y < height - insetY
+  );
+}
+
 /** Moves the camera to look at one hex without changing the viewing angle. */
 export function lookAt(viewer, frame, x, y, { duration = 0.7 } = {}) {
   const camera = viewer.camera;

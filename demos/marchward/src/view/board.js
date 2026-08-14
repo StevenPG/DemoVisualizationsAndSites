@@ -15,7 +15,7 @@
 import * as Cesium from 'cesium';
 import { RELIEF, SIEGE, TERRAIN } from '../config.js';
 import { CORNER_OFFSETS, HEX_CIRCUMRADIUS, HEX_COUNT, centreMeters, edgeEndpointsMeters } from '../hex.js';
-import { BASE_HEIGHT, colourFromHex, hexCentre, hexHeight } from './geo.js';
+import { BASE_HEIGHT, colourFromHex, hexCentre, hexCorners, hexHeight } from './geo.js';
 
 const WALL_HEIGHT = 620;
 const WALL_THICKNESS = 260;
@@ -47,6 +47,8 @@ export function createBoard(scene, frame, map, theatre, { alpha = RELIEF.tileAlp
       id: pickIds[i],
     });
   }
+
+  const outlines = impassableOutlines(scene, frame, map);
 
   const primitive = scene.primitives.add(
     new Cesium.Primitive({
@@ -108,8 +110,37 @@ export function createBoard(scene, frame, map, theatre, { alpha = RELIEF.tileAlp
       tinted = [];
       scene.requestRender();
     },
-    destroy: () => scene.primitives.remove(primitive),
+    destroy: () => {
+      scene.primitives.remove(primitive);
+      outlines.destroy();
+    },
   };
+}
+
+/**
+ * A dark rim around every hex an army cannot enter.
+ *
+ * Colour alone was carrying this, and it could not: a mountain is a brown tile
+ * among brown tiles and a river is a blue one, and neither says "you may not
+ * go here" from a camera 40 km up. An outline does, and it does it without
+ * spending any of the palette, which the terrain types already use up.
+ */
+function impassableOutlines(scene, frame, map) {
+  const collection = scene.primitives.add(new Cesium.PolylineCollection());
+  const ink = Cesium.Color.fromCssColorString('#0d1013').withAlpha(0.9);
+
+  for (let i = 0; i < HEX_COUNT; i += 1) {
+    if (TERRAIN[map.terrain[i]].passable) continue;
+    // Lifted clear of the tile top so it does not fight with it for depth.
+    const ring = hexCorners(frame, i, hexHeight(map, i) + 22);
+    collection.add({
+      positions: [...ring, ring[0]],
+      width: 2.5,
+      material: Cesium.Material.fromType('Color', { color: ink }),
+    });
+  }
+
+  return { destroy: () => scene.primitives.remove(collection) };
 }
 
 /**
@@ -232,8 +263,17 @@ export function createCastles(scene, frame, map, state) {
   const primitives = new Cesium.PrimitiveCollection();
   scene.primitives.add(primitives);
   let current = null;
+  let signature = null;
 
   const rebuild = () => {
+    // The keep's height tracks the garrison, so that plus the owner is the
+    // whole of what the geometry depends on.
+    const next = ['crown', 'marcher']
+      .map((key) => `${Math.round(state.sides[key].garrison)}:${state.sides[key].castle}`)
+      .join('|');
+    if (next === signature && current) return;
+    signature = next;
+
     if (current) primitives.remove(current);
     const instances = [];
 
@@ -303,8 +343,15 @@ export function createWalls(scene, frame, map, state) {
   const primitives = new Cesium.PrimitiveCollection();
   scene.primitives.add(primitives);
   let current = null;
+  let signature = null;
 
   const rebuild = () => {
+    const next = [...state.walls]
+      .map(([key, wall]) => `${key}:${wall.side}:${wall.integrity}`)
+      .join('|');
+    if (next === signature) return;
+    signature = next;
+
     if (current) {
       primitives.remove(current);
       current = null;
