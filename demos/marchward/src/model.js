@@ -229,6 +229,21 @@ export function moveTargets(state, stack, field = reachableFrom(state, stack)) {
   return out;
 }
 
+/**
+ * Friendly columns this one can reach and join this turn.
+ *
+ * Joining is a march like any other — moveStack already folds one column into
+ * another when it arrives on it — so this is just the subset of destinations
+ * that happen to be occupied by a friend with room.
+ */
+export function mergeTargets(state, stack) {
+  const out = new Map();
+  for (const [hex, entry] of moveTargets(state, stack)) {
+    if (entry.merge !== undefined) out.set(hex, entry);
+  }
+  return out;
+}
+
 const canMerge = (into, from) =>
   into.officers + from.officers <= ARMY.maxOfficersPerStack &&
   into.troops + from.troops <= (into.officers + from.officers) * ARMY.maxTroopsPerOfficer;

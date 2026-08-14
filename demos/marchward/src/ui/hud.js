@@ -12,6 +12,7 @@ import { AP, ARMY, MATCH, SIEGE, TERRAIN, WALLS } from '../config.js';
 import {
   castleOwnerAt,
   forecastAttack,
+  mergeTargets,
   movementAllowance,
   recruitCapacity,
   stackAt,
@@ -124,8 +125,9 @@ export function createHud({ actions, audio }) {
       ${ui.mode === 'split' ? splitForm(stack) : ''}
       ${ui.mode === 'recruit' ? recruitForm(state, stack) : ''}
       ${ui.mode === 'wall' ? '<p class="empty-note" style="margin-top:0.7rem">Click a hex beside this column to raise a wall along that edge.</p>' : ''}
+      ${ui.mode === 'merge' ? '<p class="empty-note" style="margin-top:0.7rem">Click a highlighted friendly column to march this one onto it and join the two.</p>' : ''}
       ${forecastBlock(state, stack, ui)}
-      ${yours ? '' : raiseBlock(state)}
+      ${raiseBlock(state, stack)}
     `;
 
     if (yours) wireOrders(state, stack, ui);
@@ -144,6 +146,7 @@ export function createHud({ actions, audio }) {
         <span>${label}</span><span class="cost">${cost}</span>
       </button>`;
 
+    const joinable = yourTurn && stack.mp > 0 ? mergeTargets(state, stack).size : 0;
     const canSplit = stack.officers >= 2 && side.ap >= AP.split && yourTurn;
     const canWall =
       side.ap >= AP.buildWall && side.wallsBuilt < WALLS.maxSegmentsPerSide && yourTurn;
@@ -155,6 +158,10 @@ export function createHud({ actions, audio }) {
           atCastle ? (room ? '' : 'This column is full — it needs another officer.') : 'Only at your castle.')}
         ${button('split', 'Divide the column', `${AP.split} AP`, canSplit,
           stack.officers < 2 ? 'A column needs two officers to divide.' : '')}
+        ${button('merge', 'Join another column', 'free', joinable > 0,
+          joinable > 0
+            ? ''
+            : 'No friendly column is within reach that this one could join — together they must fit under four officers.')}
         ${button('wall', 'Raise a wall', `${AP.buildWall} AP`, canWall,
           side.wallsBuilt >= WALLS.maxSegmentsPerSide ? 'You are holding the maximum number of segments.' : '')}
         ${ui.mode !== 'select' ? '<button type="button" data-order="cancel"><span>Cancel</span></button>' : ''}
@@ -180,19 +187,28 @@ export function createHud({ actions, audio }) {
   }
 
   /** Raising officers is done from the castle rather than from a column, so it lives on its own. */
-  function raiseBlock(state) {
+  function raiseBlock(state, selected = null) {
     const side = state.sides.crown;
     const officers = [...state.stacks.values()]
       .filter((s) => s.side === 'crown')
       .reduce((n, s) => n + s.officers, 0);
-    const can =
-      state.activeSide === 'crown' && side.ap >= AP.spawnOfficer && officers < ARMY.maxOfficersPerSide;
+    const atCap = officers >= ARMY.maxOfficersPerSide;
+    const can = state.activeSide === 'crown' && side.ap >= AP.spawnOfficer && !atCap;
+
+    // A new officer musters into whatever column is standing on the castle, so
+    // say so when that is the column being looked at — otherwise it is not
+    // obvious that this is how you reinforce a castle garrison column.
+    const onCastle = stackAt(state, side.castle);
+    const joins =
+      onCastle && onCastle.side === 'crown' && onCastle.officers < ARMY.maxOfficersPerStack;
+    const label =
+      joins && selected && selected.id === onCastle.id ? 'Raise an officer into this column' : 'Raise an officer';
 
     return `
       <div class="order-buttons" style="margin-top:0.8rem">
         <button type="button" data-raise="officer" ${can ? '' : 'disabled'}
-          title="${officers >= ARMY.maxOfficersPerSide ? 'You are already fielding eight officers.' : ''}">
-          <span>Raise an officer</span><span class="cost">${AP.spawnOfficer} AP</span>
+          title="${atCap ? `You are already fielding ${ARMY.maxOfficersPerSide} officers.` : 'Musters at your castle, joining the column standing there if it has room.'}">
+          <span>${label}</span><span class="cost">${AP.spawnOfficer} AP</span>
         </button>
       </div>
     `;
@@ -388,6 +404,7 @@ export function createHud({ actions, audio }) {
     endTurn.textContent = 'End turn';
 
     if (ui.mode === 'wall') prompt.textContent = 'Click a hex beside the selected column to wall that edge.';
+    else if (ui.mode === 'merge') prompt.textContent = 'Click a highlighted friendly column to join the two together.';
     else if (ui.selectedId !== null && !ui.armed) {
       prompt.textContent = 'Click that column on the map to give it orders.';
     }

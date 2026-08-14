@@ -34,8 +34,16 @@ export const CAMERA = {
   /** Straight down is -90°; anything flatter than -32° and the prisms hide each other. */
   minPitch: Cesium.Math.toRadians(-89),
   maxPitch: Cesium.Math.toRadians(-32),
-  /** How far past the board edge the camera may drift, as a fraction of the board. */
-  marginFraction: 0.28,
+  /**
+   * How far past the board edge you may look, as a fraction of the board.
+   *
+   * Applied to the ground point in view rather than to the camera, so it means
+   * the same thing in every direction. It stays small because the bound is on
+   * the centre of the screen: everything below the centre is nearer the camera
+   * and therefore further past the edge again, so the margin you actually see
+   * is roughly double this.
+   */
+  marginFraction: 0.08,
 };
 
 export async function createViewer(containerId, theatre, { shadows = true } = {}) {
@@ -136,9 +144,21 @@ export function setShadows(viewer, enabled) {
 /**
  * Keeps the camera over the board.
  *
+ * What gets clamped is the point on the ground the camera is *looking at*, not
+ * the camera's own position. Clamping the position looks equivalent and is not:
+ * a camera tilted to -56 degrees sits a long way south of whatever it has in
+ * frame, so bounding the position lets you sail past the north edge (the camera
+ * is still well inside while looking well outside) and stops you well short of
+ * the south edge (reaching it needs the camera further south than the bound
+ * allows). The board ends up with a generous top margin and an unreachable
+ * bottom, which is exactly backwards.
+ *
+ * Solving for where the view ray crosses the ground plane and bounding that
+ * makes the cage symmetrical, and means the margin is expressed in the thing
+ * the player actually perceives.
+ *
  * Runs after the controller has had its say each frame and only corrects when
- * something is actually out of range, so ordinary panning and zooming feel
- * untouched — the cage is only noticeable when you hit it.
+ * something is genuinely out of range, so ordinary panning feels untouched.
  */
 export function cageCamera(viewer, frame) {
   const camera = viewer.camera;
@@ -153,17 +173,25 @@ export function cageCamera(viewer, frame) {
 
   const apply = () => {
     const local = frame.toBoard(camera.positionWC);
-    const x = clamp(local.x, limits.minX, limits.maxX);
-    const y = clamp(local.y, limits.minY, limits.maxY);
+    const direction = frame.toBoardVector(camera.directionWC);
     const pitch = clamp(camera.pitch, CAMERA.minPitch, CAMERA.maxPitch);
-
-    const driftedX = Math.abs(x - local.x) > 1;
-    const driftedY = Math.abs(y - local.y) > 1;
     const tilted = Math.abs(pitch - camera.pitch) > 1e-4;
-    if (!driftedX && !driftedY && !tilted) return;
 
+    // Where the view ray meets the ground. A camera pointing at or above the
+    // horizon has no such point, in which case fall back to its own position.
+    const looking =
+      direction.z < -1e-6
+        ? { x: local.x + direction.x * (-local.z / direction.z), y: local.y + direction.y * (-local.z / direction.z) }
+        : { x: local.x, y: local.y };
+
+    const shiftX = clamp(looking.x, limits.minX, limits.maxX) - looking.x;
+    const shiftY = clamp(looking.y, limits.minY, limits.maxY) - looking.y;
+    if (Math.abs(shiftX) < 1 && Math.abs(shiftY) < 1 && !tilted) return;
+
+    // Move the camera by whatever the target had to move, so the correction is
+    // a slide rather than a jump to somewhere else entirely.
     camera.setView({
-      destination: frame.toCartesian(x, y, local.z),
+      destination: frame.toCartesian(local.x + shiftX, local.y + shiftY, local.z),
       orientation: { heading: camera.heading, pitch, roll: 0 },
     });
   };

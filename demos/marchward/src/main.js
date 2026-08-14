@@ -21,6 +21,7 @@ import {
   createGame,
   endTurn,
   forecastAttack,
+  mergeTargets,
   moveStack,
   moveTargets,
   reachableFrom,
@@ -338,6 +339,16 @@ function onClickHex(hex) {
     return;
   }
 
+  // Joining has to be handled before the branch below, which selects any
+  // friendly column that is clicked and returns. That branch is why merging was
+  // unreachable: moveStack has always folded one column into another on
+  // arrival, and moveTargets has always offered friendly hexes as
+  // destinations, but a click on one only ever changed the selection.
+  if (ui.mode === 'merge' && stack) {
+    finishMerge(stack, hex);
+    return;
+  }
+
   const occupant = stackAt(state, hex);
 
   // Selecting one of your own columns always wins — you can never be trapped
@@ -433,6 +444,10 @@ function order(kind, stack) {
     ui.mode = 'wall';
     ui.armed = true;
   }
+  if (kind === 'merge') {
+    ui.mode = 'merge';
+    ui.armed = true;
+  }
   refresh();
 }
 
@@ -454,6 +469,33 @@ function finishSplit(stack, hex) {
     ui.mode = 'select';
     audio.play('officer');
   }
+}
+
+/**
+ * Fold this column into a friendly one it can reach. The march itself does the
+ * work — moveStack merges whatever it arrives on — so this only has to check
+ * that the target is a legal one and report it when it is not.
+ */
+function finishMerge(stack, hex) {
+  const { state } = session;
+  if (!mergeTargets(state, stack).has(hex)) {
+    hud.toast(
+      'That column cannot be joined this turn. It has to be within marching reach, and the two together must fit under four officers.',
+    );
+    ui.mode = 'select';
+    refresh();
+    return;
+  }
+
+  const joining = stack.id;
+  const result = apply(moveStack(state, stack.id, hex));
+  if (!result.ok) return;
+
+  ui.mode = 'select';
+  audio.play('march');
+  // The column that marched has ceased to exist; follow the combined one.
+  if (!state.stacks.has(joining)) ui.selectedId = stackAt(state, hex)?.id ?? null;
+  refresh();
 }
 
 function finishWall(stack, hex) {

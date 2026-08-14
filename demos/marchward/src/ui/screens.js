@@ -231,7 +231,7 @@ export function renderSettings({ audio, settings, onChange }) {
       settings.tileAlpha = value;
       onChange();
     },
-    { min: 35, max: 100 },
+    { min: 20, max: 100 },
   );
 
   toggle(
@@ -292,10 +292,11 @@ export function renderRules() {
     ['Attack an adjacent column', AP.attack, 'Ends that column’s movement for the turn.'],
     ['Storm the castle', AP.assault, 'Also knocks a permanent bite out of the walls.'],
     ['Divide a column', AP.split, 'The detachment forms on an adjacent hex with a full allowance.'],
+    ['Join two columns', 'free', `At most ${ARMY.maxOfficersPerStack} officers in the combined column.`],
     ['Raise a wall', AP.buildWall, `On an edge of a hex you hold. ${WALLS.maxSegmentsPerSide} segments at most.`],
     ['Breach a wall', AP.breachWall, `Walls take ${WALLS.integrity} turns of work to open.`],
   ]
-    .map(([what, cost, note]) => `<tr><td>${what}</td><td>${cost} AP</td><td style="font-family:var(--sans);color:var(--ink-dim)">${note}</td></tr>`)
+    .map(([what, cost, note]) => `<tr><td>${what}</td><td>${typeof cost === 'number' ? `${cost} AP` : cost}</td><td style="font-family:var(--sans);color:var(--ink-dim)">${note}</td></tr>`)
     .join('');
 
   body.innerHTML = `
@@ -328,6 +329,13 @@ export function renderRules() {
       ${MOVEMENT.minAllowance}. That is the whole argument for dividing: 14,000 troops under two
       officers crawl, but split into two columns of 7,000 they each move fast and in different
       directions. A column may always advance at least one hex, whatever the ground costs.
+    </p>
+    <p>
+      Two of your columns can be <strong>joined</strong> back together: select one, choose
+      <em>Join another column</em>, and click a friendly column it can reach. It marches onto the
+      other and the two become one. Joining is free — only dividing costs an AP — but the combined
+      column may hold no more than ${ARMY.maxOfficersPerStack} officers, and it moves at the pace
+      its new size allows.
     </p>
     <p>
       Marching into a hex next to an enemy column <strong>ends the march there</strong>. A small

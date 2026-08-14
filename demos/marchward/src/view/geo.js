@@ -37,7 +37,13 @@ export function createFrame(theatre) {
     return { x: local.x + extent.centreX, y: local.y + extent.centreY, z: local.z };
   };
 
-  return { origin, toFixed, toLocal, toCartesian, toBoard, theatre };
+  /** A direction (not a position) from ECEF into board axes. */
+  const toBoardVector = (vector) => {
+    const local = Cesium.Matrix4.multiplyByPointAsVector(toLocal, vector, new Cesium.Cartesian3());
+    return { x: local.x, y: local.y, z: local.z };
+  };
+
+  return { origin, toFixed, toLocal, toCartesian, toBoard, toBoardVector, theatre };
 }
 
 /**

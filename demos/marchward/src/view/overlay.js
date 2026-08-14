@@ -10,7 +10,7 @@
 
 import * as Cesium from 'cesium';
 import { TERRAIN } from '../config.js';
-import { forecastAttack, moveTargets, reachableFrom, stackAt, castleOwnerAt } from '../model.js';
+import { forecastAttack, mergeTargets, moveTargets, reachableFrom, stackAt, castleOwnerAt } from '../model.js';
 import { neighboursOf } from '../hex.js';
 import { wallBlocks } from '../supply.js';
 
@@ -27,6 +27,7 @@ const HIGHLIGHTS = {
   selected: { colour: '#ffe08a', strength: 0.72 },
   siege: { colour: '#f2c14e', strength: 0.6 },
   wall: { colour: '#cfbaee', strength: 0.62 },
+  join: { colour: '#8fd6c2', strength: 0.68 },
 };
 
 /**
@@ -49,6 +50,12 @@ export function highlightsFor(state, board, { selectedId, mode, armed = false })
     return entries;
   }
 
+  if (mode === 'merge') {
+    for (const hex of mergeTargets(state, stack).keys()) push(hex, 'join');
+    push(stack.hex, 'selected');
+    return entries;
+  }
+
   // A column that has only been looked at gets marked, but nothing is offered
   // to it. Lighting the movement range is the game saying "click here and this
   // army marches", so it waits until the player has armed the column by
@@ -59,7 +66,13 @@ export function highlightsFor(state, board, { selectedId, mode, armed = false })
   }
 
   if (stack.side === state.activeSide && stack.mp > 0) {
-    for (const hex of moveTargets(state, stack, reachableFrom(state, stack)).keys()) push(hex, 'reachable');
+    // Friendly-occupied hexes are legal destinations to the rules — arriving on
+    // one joins the columns — but a plain click on them selects that column
+    // instead, so lighting them as ordinary movement would be a lie. They are
+    // offered under the Join order, which has its own colour.
+    for (const [hex, entry] of moveTargets(state, stack, reachableFrom(state, stack))) {
+      if (entry.merge === undefined) push(hex, 'reachable');
+    }
   }
 
   if (!stack.attacked && stack.troops > 0) {

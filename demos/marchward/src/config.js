@@ -33,11 +33,12 @@ export const RELIEF = {
    *
    * Slightly translucent so the satellite imagery of the real ground shows
    * through the generated board — the point of anchoring the theatre to a
-   * genuine rectangle of the world is rather lost if the board hides it. High
-   * enough that the terrain colours still read as terrain, and that a mountain
-   * in front of a distant tile does not turn into a window.
+   * genuine rectangle of the world is rather lost if the board hides it. At
+   * 0.76 the ground underneath was still hard to make out, so this sits a good
+   * deal lower; it is a setting rather than a constant because how it reads
+   * depends entirely on the imagery beneath, which varies by theatre.
    */
-  tileAlpha: 0.76,
+  tileAlpha: 0.55,
   heights: {
     river: 4,
     ford: 14,
