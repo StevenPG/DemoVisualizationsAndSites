@@ -8,9 +8,11 @@
  * columns readable at a glance — you can see which way an army is pointed
  * without selecting it.
  *
- * The shapes rotate; the text does not. Numbers that turned upside down with
- * the icon would be unreadable for half the compass, so the glyph positions are
- * rotated and the labels are then drawn upright at those points.
+ * The officer count stays upright wherever the column points — it is a single
+ * glyph in a disc, and a number that turned upside down with the icon would be
+ * unreadable for half the compass. The troop count is five or six glyphs and
+ * has to follow the crossbar to fit inside it, so it is drawn along the bar
+ * with a half-turn that keeps it from ever reading inverted.
  */
 
 import { ARMY } from '../config.js';
@@ -108,18 +110,31 @@ function draw(stack, colours, { bearing, selected, spent }) {
 
   ctx.restore();
 
-  // Labels, upright wherever the icon is pointing.
   const rotate = (x, y) => ({
     x: CENTRE + x * Math.cos(bearing) - y * Math.sin(bearing),
     y: CENTRE + x * Math.sin(bearing) + y * Math.cos(bearing),
   });
 
+  // The officer count is one or two glyphs inside a disc, so it stays upright
+  // whichever way the column is pointing.
   const discAt = rotate(0, DISC.at);
   label(ctx, String(stack.officers), discAt.x, discAt.y, 23, '#ffffff');
 
   if (!lone) {
     const barAt = rotate(0, (BAR.top + BAR.bottom) / 2);
-    label(ctx, stack.troops.toLocaleString(), barAt.x, barAt.y, 24, '#ffffff');
+    // The troop count runs along the crossbar rather than staying upright.
+    // Upright was fine while a column carried four glyphs, but a column now
+    // holds up to 45,000 men, and a horizontal "45,000" laid across an
+    // east-facing bar hangs well outside the shape it is meant to sit in — the
+    // bar is 94px long and only 32px thick. Following the bar gives the number
+    // the length it needs; the half-turn keeps it from ever reading upside
+    // down, so the worst case is sideways rather than inverted.
+    const along = Math.cos(bearing) > 0 ? bearing : bearing + Math.PI;
+    ctx.save();
+    ctx.translate(barAt.x, barAt.y);
+    ctx.rotate(along);
+    label(ctx, stack.troops.toLocaleString(), 0, 0, 24, '#ffffff', BAR.halfWidth * 2 - 14);
+    ctx.restore();
   }
 
   // A column that cannot trace supply home is bleeding men every turn, which
@@ -140,8 +155,13 @@ function draw(stack, colours, { bearing, selected, spent }) {
 
 const atCapacity = (stack) => stack.troops >= stack.officers * ARMY.maxTroopsPerOfficer;
 
-function label(ctx, text, x, y, size, colour) {
-  ctx.font = `700 ${size}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+function label(ctx, text, x, y, size, colour, maxWidth = Infinity) {
+  const font = (px) => `700 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.font = font(size);
+  if (Number.isFinite(maxWidth)) {
+    const measured = ctx.measureText(text).width;
+    if (measured > maxWidth) ctx.font = font(Math.max(13, Math.floor((size * maxWidth) / measured)));
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 5;
