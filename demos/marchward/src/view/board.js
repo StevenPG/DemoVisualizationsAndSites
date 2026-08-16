@@ -369,23 +369,7 @@ export function createWalls(scene, frame, map, state) {
       const damaged = wall.integrity / 2;
       const height = WALL_HEIGHT * (0.55 + 0.45 * damaged);
 
-      // Widen the segment slightly past the hex corners so neighbouring walls
-      // meet without a gap at the joint.
-      const dx = q.x - p.x;
-      const dy = q.y - p.y;
-      const length = Math.hypot(dx, dy) || 1;
-      const ux = dx / length;
-      const uy = dy / length;
-      const nx = -uy * (WALL_THICKNESS / 2);
-      const ny = ux * (WALL_THICKNESS / 2);
-      const overhang = 40;
-
-      const corners = [
-        { x: p.x - ux * overhang + nx, y: p.y - uy * overhang + ny },
-        { x: q.x + ux * overhang + nx, y: q.y + uy * overhang + ny },
-        { x: q.x + ux * overhang - nx, y: q.y + uy * overhang - ny },
-        { x: p.x - ux * overhang - nx, y: p.y - uy * overhang - ny },
-      ];
+      const corners = wallFootprint(p, q);
 
       instances.push(
         new Cesium.GeometryInstance({
@@ -420,6 +404,91 @@ export function createWalls(scene, frame, map, state) {
 
   rebuild();
   return { rebuild, destroy: () => scene.primitives.remove(primitives) };
+}
+
+/**
+ * The plan of a wall segment: a thin box straddling the edge, widened slightly
+ * past the hex corners so neighbouring walls meet without a gap at the joint.
+ */
+function wallFootprint(p, q, thickness = WALL_THICKNESS) {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  const nx = -uy * (thickness / 2);
+  const ny = ux * (thickness / 2);
+  const overhang = 40;
+
+  return [
+    { x: p.x - ux * overhang + nx, y: p.y - uy * overhang + ny },
+    { x: q.x + ux * overhang + nx, y: q.y + uy * overhang + ny },
+    { x: q.x + ux * overhang - nx, y: q.y + uy * overhang - ny },
+    { x: p.x - ux * overhang - nx, y: p.y - uy * overhang - ny },
+  ];
+}
+
+/**
+ * Translucent stand-ins for the lines a column could wall, drawn while the
+ * player is choosing one and pickable so the choice is a click on the line
+ * itself.
+ *
+ * Walls used to be placed by clicking the *hex* on the far side of the edge you
+ * wanted, which was guesswork — the edge is not a thing you can point at. Now
+ * that a column can wall anything within two hexes there are up to thirty
+ * candidate lines at once, and picking one off a list of hexes stopped being
+ * workable at all.
+ */
+export function createWallGhosts(scene, frame, map, colours) {
+  const primitives = new Cesium.PrimitiveCollection();
+  scene.primitives.add(primitives);
+  let current = null;
+
+  const clear = () => {
+    if (!current) return;
+    primitives.remove(current);
+    current = null;
+    scene.requestRender();
+  };
+
+  const show = (targets) => {
+    clear();
+    if (!targets.length) return;
+
+    const instances = targets.map(({ from, to }) => {
+      const [p, q] = edgeEndpointsMeters(from, to);
+      const ground = Math.min(hexHeight(map, from), hexHeight(map, to));
+      const corners = wallFootprint(p, q, WALL_THICKNESS * 0.8);
+
+      return new Cesium.GeometryInstance({
+        geometry: new Cesium.PolygonGeometry({
+          polygonHierarchy: new Cesium.PolygonHierarchy(
+            corners.map((corner) => frame.toCartesian(corner.x, corner.y, 0)),
+          ),
+          height: ground + WALL_HEIGHT * 0.55,
+          extrudedHeight: ground,
+          vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+        }),
+        attributes: {
+          color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+            colourFromHex(colours.light).withAlpha(0.5),
+          ),
+        },
+        id: { kind: 'wallGhost', from, to },
+      });
+    });
+
+    current = primitives.add(
+      new Cesium.Primitive({
+        geometryInstances: instances,
+        appearance: new Cesium.PerInstanceColorAppearance({ flat: true, translucent: true, closed: false }),
+        asynchronous: false,
+      }),
+    );
+    scene.requestRender();
+  };
+
+  return { show, clear, destroy: () => scene.primitives.remove(primitives) };
 }
 
 export { TERRAIN };

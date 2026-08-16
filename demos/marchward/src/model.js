@@ -17,7 +17,15 @@ import { AP, ARMY, COMBAT, DIFFICULTIES, MATCH, MOVEMENT, SIEGE, TERRAIN, WALLS 
 import { generateMap } from './mapgen.js';
 import { THEATRES, SIDE_COLOURS } from './theatres.js';
 import { makeRng, randomSeedWord } from './rng.js';
-import { directionTowards, distance, edgeKey, neighboursOf, pathTo, reachable } from './hex.js';
+import {
+  directionTowards,
+  distance,
+  edgeKey,
+  neighboursOf,
+  pathTo,
+  reachable,
+  withinRadius,
+} from './hex.js';
 import {
   apIncome,
   applySupplyEffects,
@@ -88,18 +96,27 @@ function makeSide(key, castle, isAI) {
 }
 
 /**
- * Two columns each, deployed on the castle's own hex and beside it, facing the
- * enemy. Four of the eight available officers and 14,000 of a possible 48,000
- * troops — enough to fight with immediately, with most of the army still to be
- * raised out of AP income.
+ * The opening deployment: three columns each, on the castle's own hex and
+ * beside it, facing the enemy. Six of the sixteen available officers and 30,000
+ * of a possible 144,000 troops — enough to fight with immediately, with most of
+ * the army still to be raised out of AP income.
+ *
+ * It scales with the caps rather than being written out, so changing the army
+ * size in config does not silently leave the opening at the old scale.
  */
 function deployStartingForces(state, sideKey, enemyCastle) {
   const side = state.sides[sideKey];
   const facing = directionTowards(side.castle, enemyCastle);
   const spots = [side.castle, ...openNeighbours(state, side.castle)];
 
-  for (let i = 0; i < 2 && i < spots.length; i += 1) {
-    createStack(state, { side: sideKey, hex: spots[i], officers: 2, troops: 7000, facing });
+  for (let i = 0; i < ARMY.startingColumns && i < spots.length; i += 1) {
+    createStack(state, {
+      side: sideKey,
+      hex: spots[i],
+      officers: ARMY.startingOfficers,
+      troops: ARMY.startingTroops,
+      facing,
+    });
   }
 }
 
@@ -147,9 +164,9 @@ export const troopCount = (state, sideKey) =>
 export const stackCapacity = (stack) => stack.officers * ARMY.maxTroopsPerOfficer;
 
 /**
- * How far a stack can march this turn. Every 5,000 troops costs a movement
- * point, floored at two — so a 20,000-strong host covers 4 km of plains in a
- * turn where a 4,000-strong column covers 10 km. That gap is the entire
+ * How far a stack can march this turn. Every 8,000 troops costs a movement
+ * point, floored at three — so a 36,000-strong host covers 6 km of plains in a
+ * turn where a 6,000-strong column covers 12 km. That gap is the entire
  * argument for detaching officers, and it is why splitting is worth an AP.
  */
 export function movementAllowance(stack) {
@@ -295,6 +312,22 @@ export function moveStack(state, stackId, target) {
 // --------------------------------------------------------------------------
 // Raising and dividing forces
 // --------------------------------------------------------------------------
+
+/**
+ * Where a newly raised officer would stand, or `undefined` if nowhere.
+ *
+ * A castle with a full column on it and every neighbour occupied cannot muster
+ * anyone, and at five officers to a column that happens readily — so the panel
+ * asks this before offering the order rather than letting the click fail.
+ */
+export function musterSpot(state, sideKey) {
+  const side = state.sides[sideKey];
+  const existing = stackAt(state, side.castle);
+  if (existing && existing.side === sideKey && existing.officers < ARMY.maxOfficersPerStack) {
+    return side.castle;
+  }
+  return !existing ? side.castle : openNeighbours(state, side.castle)[0];
+}
 
 export function spawnOfficer(state, sideKey) {
   const side = state.sides[sideKey];
@@ -616,16 +649,29 @@ export function wallTargets(state, sideKey) {
   const side = state.sides[sideKey];
   if (side.wallsBuilt >= WALLS.maxSegmentsPerSide) return [];
 
-  const held = stacksOf(state, sideKey).map((s) => s.hex);
-  held.push(side.castle);
+  // Every hex within building range of a column or the castle, restricted to
+  // ground the side actually supplies. The radius is what makes walling a line
+  // an engineering decision rather than a march: a column can close the ground
+  // around itself instead of having to stand on each segment in turn.
+  const anchors = stacksOf(state, sideKey).map((s) => s.hex);
+  anchors.push(side.castle);
 
+  const held = new Set();
+  for (const anchor of anchors) {
+    for (const hex of withinRadius(anchor, WALLS.buildRange)) {
+      if (hex === side.castle || side.supplied.has(hex)) held.add(hex);
+    }
+  }
+
+  const seen = new Set();
   const out = [];
   for (const from of held) {
+    if (!TERRAIN[state.map.terrain[from]].passable) continue;
     for (const to of neighboursOf(from)) {
       const key = edgeKey(from, to);
-      if (state.walls.has(key)) continue;
+      if (state.walls.has(key) || seen.has(key)) continue;
       if (!TERRAIN[state.map.terrain[to]].passable) continue;
-      if (!TERRAIN[state.map.terrain[from]].passable) continue;
+      seen.add(key);
       out.push({ key, from, to });
     }
   }
@@ -641,7 +687,7 @@ export function buildWall(state, sideKey, from, to) {
   }
 
   const legal = wallTargets(state, sideKey).some((entry) => entry.key === edgeKey(from, to));
-  if (!legal) return fail('You can only wall an edge of a hex you hold.');
+  if (!legal) return fail(`You can only wall ground within ${WALLS.buildRange} hexes of a column of yours, inside your own supply.`);
 
   side.ap -= AP.buildWall;
   side.wallsBuilt += 1;

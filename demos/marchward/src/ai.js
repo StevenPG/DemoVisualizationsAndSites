@@ -16,7 +16,7 @@
  *   4. Fortify  — spend whatever is left on a wall, if a wall would cut you off.
  */
 
-import { AP, ARMY, SIEGE, TERRAIN, WALLS } from './config.js';
+import { AI, AP, ARMY, SIEGE, TERRAIN, WALLS } from './config.js';
 import { costField, distance, neighboursOf } from './hex.js';
 import {
   AI_SIDE,
@@ -126,6 +126,8 @@ function assess(state, sideKey) {
       return !occupant || occupant.side !== sideKey;
     }),
     heldRingCount: heldRing.length,
+    /** This side's own columns, so a column can tell where its neighbours are. */
+    ownColumns: stacksOf(state, sideKey).filter((s) => s.troops > 0 || s.officers > 0),
     threats,
     defending: myRingUnderThreat.length > 0 || threats.length > 0,
     /**
@@ -314,6 +316,23 @@ function cheapScore(state, plan, stack, hex, role) {
     }
   }
 
+  /**
+   * Keep off the next column's toes.
+   *
+   * Every column reads the same cost field, so without this they all pick the
+   * same road and the army advances as one clot down one valley — which is why
+   * doubling the officer cap on its own left board usage unchanged at nine
+   * percent. Penalising the two rings closest to another of your own columns
+   * pushes the advance onto a broad front, worth about four points of board
+   * usage in self-play, and an army spread across several approaches is much
+   * harder to sever in one place.
+   */
+  for (const other of plan.ownColumns) {
+    if (other.id === stack.id) continue;
+    const gap = distance(hex, other.hex);
+    if (gap <= 2) score -= (3 - gap) * AI.spread;
+  }
+
   // Ground worth standing on, and ground worth not being caught on.
   score += (terrain.defense - 1) * 220;
   if (terrain.key === 'ford') score -= 60;
@@ -462,9 +481,19 @@ function* fortify(state, plan) {
   // Same filter as the manoeuvre phase: a wall can only cut a line the enemy is
   // actually using, so edges that do not touch their supply are not worth
   // simulating.
-  const worthTrying = wallTargets(state, plan.sideKey).filter(
-    (option) => plan.enemySupplied.has(option.to) || plan.enemySupplied.has(option.from),
-  );
+  //
+  // The candidate list is also capped. Each trial below runs a full supply
+  // flood, and giving walls a build radius turned a few dozen candidate edges
+  // into several hundred — enough to make the AI's turn take seconds. Trying
+  // the ones nearest the enemy castle first keeps the cost flat and loses
+  // almost nothing: a wall far behind the front rarely cuts anything.
+  const worthTrying = wallTargets(state, plan.sideKey)
+    .filter((option) => plan.enemySupplied.has(option.to) || plan.enemySupplied.has(option.from))
+    .sort(
+      (a, b) =>
+        (plan.toEnemyCastle.get(a.from) ?? 99) - (plan.toEnemyCastle.get(b.from) ?? 99),
+    )
+    .slice(0, 32);
 
   for (const option of worthTrying) {
     state.walls.set(option.key, { side: plan.sideKey, integrity: WALLS.integrity, from: option.from, to: option.to });
