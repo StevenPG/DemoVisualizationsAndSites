@@ -27,7 +27,7 @@ export class Selection {
   /**
    * @param {Cesium.Viewer} viewer
    * @param {import('./simulation.js').Simulation} sim
-   * @param {() => {attach: Function, detach: Function, slotFor: Function}} getRenderer Active renderer, which changes under us.
+   * @param {() => {attach: Function, detach: Function, pickSlot: Function}} getRenderer Active renderer, which changes under us.
    */
   constructor(viewer, sim, getRenderer) {
     this.viewer = viewer;
@@ -72,7 +72,7 @@ export class Selection {
     // Clicking them should not dismiss what they are pointing at.
     if (picked && picked.id === this.entity) return;
 
-    const slot = picked ? this.getRenderer().slotFor(picked) : null;
+    const slot = this.getRenderer().pickSlot(click.position, picked, this.sim);
     if (slot === null) {
       this.clear();
       return;

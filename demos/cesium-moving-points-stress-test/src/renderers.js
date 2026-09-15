@@ -2,7 +2,7 @@
  * The three things being compared.
  *
  * All three expose the same tiny interface — attach(slot), detach(slot),
- * sync(sim), slotFor(picked) — so main.js can swap one for another without
+ * sync(sim), pickSlot(...) — so main.js can swap one for another without
  * knowing which is running, and the HUD is measuring the same call in every
  * case.
  *
@@ -36,6 +36,13 @@ import { KINDS, MAX_TOTAL } from './config.js';
 
 const KIND_COLORS = KINDS.map((kind) => Cesium.Color.fromCssColorString(kind.color));
 const scratch = new Cesium.Cartesian3();
+
+// Reused by BufferRenderer.pickSlot, which runs on a click and has no business
+// allocating a matrix and an array every time.
+const viewProjection = new Cesium.Matrix4();
+const matrixValues = new Array(16);
+const candidates = [];
+const occluder = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, Cesium.Cartesian3.ZERO);
 
 export class PointRenderer {
   constructor(scene, pointSize) {
@@ -113,8 +120,8 @@ export class PointRenderer {
     this.pool = [];
   }
 
-  slotFor(picked) {
-    return typeof picked.id === 'number' ? picked.id : null;
+  pickSlot(_windowPosition, picked) {
+    return typeof picked?.id === 'number' ? picked.id : null;
   }
 }
 
@@ -169,10 +176,19 @@ export class BufferRenderer {
         show: this.visible,
         primitiveCountMax: MAX_TOTAL,
         blendOption: Cesium.BlendOption.OPAQUE,
-        // Picking is what makes click-to-inspect work, and it is not free here:
-        // the collection builds one pick id per point the first time it renders
-        // after the population grows.
-        allowPicking: true,
+        // FLOAT rather than the default DOUBLE, which is the difference between
+        // Cesium binding this collection's own position array straight to the
+        // vertex attribute and it re-encoding every moved point into separate
+        // high/low float arrays each frame. Float32 puts about 0.4 m of error
+        // on an ECEF coordinate, which is a fraction of a pixel for points this
+        // size until you are standing on them.
+        positionDatatype: Cesium.ComponentDatatype.FLOAT,
+        // Off on purpose. GPU picking costs a pick id and a wrapper object per
+        // point — 600,000 of each at this demo's ceiling, which is exactly the
+        // per-point JavaScript object this collection type exists to avoid. The
+        // click search in pickSlot() below does the same job from the positions
+        // the simulation already has, and costs nothing until someone clicks.
+        allowPicking: false,
         // Left unset, the collection recomputes its own bounding sphere every
         // time a position changes — which for this demo is every point, every
         // frame. One sphere big enough for the globe and everything in orbit
@@ -276,13 +292,80 @@ export class BufferRenderer {
   }
 
   /**
-   * A buffer point has no object of its own to pick, so Cesium hands back
-   * `{collection, index}` and the slot comes from our own reverse map.
+   * Finds the mover under the cursor without the GPU's help.
+   *
+   * Every live mover's world position is already sitting in the simulation's
+   * typed arrays, so this projects them itself: one view-projection matrix,
+   * then sixteen multiply-adds per mover, inline, with no Cartesian allocated.
+   * At the ceiling that is a few milliseconds on a click and nothing at all on
+   * every other frame, against a pick id per point for as long as the page is
+   * open.
+   *
+   * What it gives up is the depth buffer. A candidate behind the globe is
+   * rejected by an ellipsoid horizon test rather than by what was actually
+   * drawn, so a mover tucked behind a mountain is pickable where the GPU would
+   * have refused it. On a planet-scale scatter of points that is a fair trade.
    */
-  slotFor(picked) {
-    if (!this.collection || picked.collection !== this.collection) return null;
-    const slot = this.indexToSlot[picked.index];
-    return slot === undefined || slot === -1 ? null : slot;
+  pickSlot(windowPosition, _picked, sim) {
+    if (!this.collection || !sim) return null;
+
+    const scene = this.scene;
+    const camera = scene.camera;
+    Cesium.Matrix4.multiply(camera.frustum.projectionMatrix, camera.viewMatrix, viewProjection);
+    const m = Cesium.Matrix4.toArray(viewProjection, matrixValues); // column-major
+
+    const width = scene.canvas.clientWidth;
+    const height = scene.canvas.clientHeight;
+    const targetX = windowPosition.x;
+    const targetY = windowPosition.y;
+    // Generous next to the point itself: a 4 px dot is hard to hit exactly, and
+    // the nearest candidate wins anyway.
+    const radius = this.pointSize / 2 + 4;
+    const radiusSq = radius * radius;
+
+    const { px, py, pz } = sim;
+    candidates.length = 0;
+
+    for (const group of sim.groups) {
+      const slots = group.slots;
+      for (let a = 0; a < group.count; a++) {
+        const slot = slots[a];
+        if (this.slotToIndex[slot] === -1) continue;
+        const x = px[slot];
+        const y = py[slot];
+        const z = pz[slot];
+
+        const clipW = m[3] * x + m[7] * y + m[11] * z + m[15];
+        if (clipW <= 0) continue; // behind the camera
+        const clipX = m[0] * x + m[4] * y + m[8] * z + m[12];
+        const screenX = ((clipX / clipW) * 0.5 + 0.5) * width;
+        const dx = screenX - targetX;
+        if (dx * dx > radiusSq) continue;
+        const clipY = m[1] * x + m[5] * y + m[9] * z + m[13];
+        const screenY = (1 - ((clipY / clipW) * 0.5 + 0.5)) * height;
+        const dy = screenY - targetY;
+        if (dx * dx + dy * dy > radiusSq) continue;
+
+        candidates.push(slot, clipW); // clipW is eye depth: smaller is nearer
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Nearest first, then the first one the globe is not standing in front of.
+    const order = [];
+    for (let i = 0; i < candidates.length; i += 2) order.push(i);
+    order.sort((a, b) => candidates[a + 1] - candidates[b + 1]);
+
+    occluder.cameraPosition = camera.positionWC;
+    for (const i of order) {
+      const slot = candidates[i];
+      scratch.x = px[slot];
+      scratch.y = py[slot];
+      scratch.z = pz[slot];
+      if (occluder.isPointVisible(scratch)) return slot;
+    }
+    return null;
   }
 }
 
@@ -363,8 +446,8 @@ export class EntityRenderer {
     for (const held of this.pool) if (held) held.entity.point.pixelSize = size;
   }
 
-  slotFor(picked) {
-    return picked.id?.movingPointSlot ?? null;
+  pickSlot(_windowPosition, picked) {
+    return picked?.id?.movingPointSlot ?? null;
   }
 
   clear() {
