@@ -27,7 +27,7 @@ export class Selection {
   /**
    * @param {Cesium.Viewer} viewer
    * @param {import('./simulation.js').Simulation} sim
-   * @param {() => {attach: Function, detach: Function}} getRenderer Active renderer, which changes under us.
+   * @param {() => {attach: Function, detach: Function, slotFor: Function}} getRenderer Active renderer, which changes under us.
    */
   constructor(viewer, sim, getRenderer) {
     this.viewer = viewer;
@@ -72,7 +72,7 @@ export class Selection {
     // Clicking them should not dismiss what they are pointing at.
     if (picked && picked.id === this.entity) return;
 
-    const slot = resolveSlot(picked);
+    const slot = picked ? this.getRenderer().slotFor(picked) : null;
     if (slot === null) {
       this.clear();
       return;
@@ -209,20 +209,6 @@ export class Selection {
   }
 }
 
-/**
- * Turns whatever `scene.pick` returned into a slot index.
- *
- * Point mode hands back a PointPrimitive whose id is the slot integer; entity
- * mode hands back the Entity, which carries the slot as a property. Anything
- * else — terrain, the selected pin itself, a label — is not a mover.
- */
-function resolveSlot(picked) {
-  if (!picked) return null;
-  if (typeof picked.id === 'number') return picked.id;
-  if (picked.id?.movingPointSlot !== undefined) return picked.id.movingPointSlot;
-  return null;
-}
-
 // ------------------------------------------------------------------- markup
 
 const nf = (value, digits = 0) =>
@@ -264,7 +250,7 @@ function describeHtml(d) {
     `<table class="cesium-infoBox-defaultTable"><tbody>` +
     rows.map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join('') +
     `</tbody></table>` +
-    `<p style="opacity:.7;margin-top:8px">Promoted from a point primitive on click. ` +
+    `<p style="opacity:.7;margin-top:8px">Promoted from a point in the active renderer on click. ` +
     `Slot and generation are the simulation's own identifiers — the generation changes when the slot is reused.</p>`
   );
 }

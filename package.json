@@ -14,9 +14,9 @@
     "new": "node scripts/new-demo.mjs"
   },
   "devDependencies": {
-    "vite": "^7.1.5"
+    "vite": "8.3.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || >=22.12.0"
   }
 }
