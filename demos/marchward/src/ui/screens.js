@@ -302,7 +302,7 @@ export function renderRules() {
     ['Storm the castle', AP.assault, 'Also knocks a permanent bite out of the walls.'],
     ['Divide a column', AP.split, 'The detachment forms on an adjacent hex with a full allowance.'],
     ['Join two columns', 'free', `At most ${ARMY.maxOfficersPerStack} officers in the combined column.`],
-    ['Raise a wall', AP.buildWall, `On an edge of a hex you hold. ${WALLS.maxSegmentsPerSide} segments at most.`],
+    ['Raise a wall', AP.buildWall, `Within ${WALLS.buildRange} hexes of a column, inside your supply. ${WALLS.maxSegmentsPerSide} at most.`],
     ['Breach a wall', AP.breachWall, `Walls take ${WALLS.integrity} turns of work to open.`],
   ]
     .map(([what, cost, note]) => `<tr><td>${what}</td><td>${typeof cost === 'number' ? `${cost} AP` : cost}</td><td style="font-family:var(--sans);color:var(--ink-dim)">${note}</td></tr>`)
@@ -326,7 +326,8 @@ export function renderRules() {
         the <strong>number of officers</strong>. The crossbar trails behind as the base and carries
         the <strong>troops</strong>. Troops never move without an officer, and one officer leads at
         most ${ARMY.maxTroopsPerOfficer.toLocaleString()} — so
-        ${(ARMY.maxTroopsPerOfficer * 4).toLocaleString()} men need four.
+        ${(ARMY.maxTroopsPerOfficer * ARMY.maxOfficersPerStack).toLocaleString()} men need
+        ${ARMY.maxOfficersPerStack}, which is as many as one column can hold.
         A dashed red ring means the column is cut off and deserting.
       </div>
     </div>
@@ -346,9 +347,11 @@ export function renderRules() {
     <p>
       A column gets ${MOVEMENT.baseAllowance} movement points, less one for every
       ${MOVEMENT.troopsPerPenalty.toLocaleString()} troops it is carrying, never below
-      ${MOVEMENT.minAllowance}. That is the whole argument for dividing: 14,000 troops under two
-      officers crawl, but split into two columns of 7,000 they each move fast and in different
-      directions. A column may always advance at least one hex, whatever the ground costs.
+      ${MOVEMENT.minAllowance}. That is the whole argument for dividing: a full column of
+      ${(ARMY.maxTroopsPerOfficer * ARMY.maxOfficersPerStack).toLocaleString()} crawls along at the
+      floor, but split into ${ARMY.maxOfficersPerStack} columns of
+      ${ARMY.maxTroopsPerOfficer.toLocaleString()} they each move fast and in different directions.
+      A column may always advance at least one hex, whatever the ground costs.
     </p>
     <p>
       Two of your columns can be <strong>joined</strong> back together: select one, choose
@@ -393,9 +396,12 @@ export function renderRules() {
     <h3>Walls</h3>
     <p>
       A wall is raised on the <em>edge</em> between two hexes, not on a hex: select a column, choose
-      <em>Raise a wall</em>, and click one of the six hexes beside it. It costs ${AP.buildWall} AP
-      and you may hold ${WALLS.maxSegmentsPerSide} segments at once, so walls are for closing one
-      line rather than fencing off the map.
+      <em>Raise a wall</em>, and every line that column could close is marked on the board — click
+      one. A column can wall anything within <strong>${WALLS.buildRange} hexes</strong> of itself,
+      as long as the ground is inside your own supply, so closing a line is an afternoon's
+      engineering rather than a week of marching to each segment in turn. It costs
+      ${AP.buildWall} AP and you may hold ${WALLS.maxSegmentsPerSide} segments at once, which is
+      enough to shut a valley but not to fence off the map.
     </p>
     <p>
       Your own walls have gates and do not slow you down. The enemy's block both

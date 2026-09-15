@@ -15,6 +15,7 @@ import {
   mergeTargets,
   moveTargets,
   movementAllowance,
+  musterSpot,
   recruitCapacity,
   stackAt,
   stackCapacity,
@@ -125,7 +126,11 @@ export function createHud({ actions, audio }) {
       ${yours ? orderButtons(state, stack, ui) : enemyNote(state, stack)}
       ${ui.mode === 'split' ? splitForm(stack) : ''}
       ${ui.mode === 'recruit' ? recruitForm(state, stack) : ''}
-      ${ui.mode === 'wall' ? '<p class="empty-note" style="margin-top:0.7rem">Click a hex beside this column to raise a wall along that edge.</p>' : ''}
+      ${
+        ui.mode === 'wall'
+          ? `<p class="empty-note" style="margin-top:0.7rem">Every line this column could wall is marked on the board — within ${WALLS.buildRange} hexes of it, on ground you supply. Click one to raise it.</p>`
+          : ''
+      }
       ${ui.mode === 'merge' ? '<p class="empty-note" style="margin-top:0.7rem">Click a highlighted friendly column to march this one onto it and join the two.</p>' : ''}
       ${marchBlock(state, stack, ui)}
       ${forecastBlock(state, stack, ui)}
@@ -163,7 +168,7 @@ export function createHud({ actions, audio }) {
         ${button('merge', 'Join another column', 'free', joinable > 0,
           joinable > 0
             ? ''
-            : 'No friendly column is within reach that this one could join — together they must fit under four officers.')}
+            : `No friendly column stands beside this one that it could join — together they must fit under ${ARMY.maxOfficersPerStack} officers.`)}
         ${button('wall', 'Raise a wall', `${AP.buildWall} AP`, canWall,
           side.wallsBuilt >= WALLS.maxSegmentsPerSide ? 'You are holding the maximum number of segments.' : '')}
         ${ui.mode !== 'select' ? '<button type="button" data-order="cancel"><span>Cancel</span></button>' : ''}
@@ -195,7 +200,12 @@ export function createHud({ actions, audio }) {
       .filter((s) => s.side === 'crown')
       .reduce((n, s) => n + s.officers, 0);
     const atCap = officers >= ARMY.maxOfficersPerSide;
-    const can = state.activeSide === 'crown' && side.ap >= AP.spawnOfficer && !atCap;
+    // Room to stand is a real constraint at five officers to a column: the
+    // castle column fills, the ring around it fills, and then there is nowhere
+    // for the next officer to muster until something marches off. Without this
+    // the button stayed lit and the click silently failed.
+    const crowded = musterSpot(state, 'crown') === undefined;
+    const can = state.activeSide === 'crown' && side.ap >= AP.spawnOfficer && !atCap && !crowded;
 
     // A new officer musters into whatever column is standing on the castle, so
     // say so when that is the column being looked at — otherwise it is not
@@ -209,10 +219,21 @@ export function createHud({ actions, audio }) {
     return `
       <div class="order-buttons" style="margin-top:0.8rem">
         <button type="button" data-raise="officer" ${can ? '' : 'disabled'}
-          title="${atCap ? `You are already fielding ${ARMY.maxOfficersPerSide} officers.` : 'Musters at your castle, joining the column standing there if it has room.'}">
+          title="${
+            atCap
+              ? `You are already fielding ${ARMY.maxOfficersPerSide} officers.`
+              : crowded
+                ? 'Your castle and every hex around it are full — march a column out to make room.'
+                : 'Musters at your castle, joining the column standing there if it has room.'
+          }">
           <span>${label}</span><span class="cost">${AP.spawnOfficer} AP</span>
         </button>
       </div>
+      ${
+        crowded && !atCap && state.activeSide === 'crown' && side.ap >= AP.spawnOfficer
+          ? '<p class="empty-note" style="margin-top:0.5rem">No room to muster: your castle and every hex beside it are occupied. March a column out first.</p>'
+          : ''
+      }
     `;
   }
 
@@ -590,7 +611,7 @@ export function createHud({ actions, audio }) {
     endTurn.classList.remove('thinking');
     endTurn.textContent = 'End turn';
 
-    if (ui.mode === 'wall') prompt.textContent = 'Click a hex beside the selected column to wall that edge.';
+    if (ui.mode === 'wall') prompt.textContent = 'Click one of the marked lines to raise a wall there.';
     else if (ui.mode === 'merge') prompt.textContent = 'Click a highlighted friendly column to join the two together.';
     else if (ui.pendingMove !== null && ui.pendingMove !== undefined) {
       prompt.textContent = 'Click that hex again to march there.';

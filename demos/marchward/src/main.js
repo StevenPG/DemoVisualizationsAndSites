@@ -9,8 +9,8 @@
 
 import * as Cesium from 'cesium';
 import { createAudio } from './audio.js';
-import { RELIEF } from './config.js';
-import { centreMeters, neighboursOf } from './hex.js';
+import { RELIEF, WALLS } from './config.js';
+import { centreMeters, distance, neighboursOf } from './hex.js';
 import { aiTurnSteps, takeAiTurn } from './ai.js';
 import {
   assaultCastle,
@@ -30,10 +30,11 @@ import {
   splitStack,
   stackAt,
   summarise,
+  wallTargets,
 } from './model.js';
 import { wallBlocks } from './supply.js';
 import { DEFAULT_THEATRE } from './theatres.js';
-import { createBoard, createCastles, createWalls } from './view/board.js';
+import { createBoard, createCastles, createWallGhosts, createWalls } from './view/board.js';
 import { createFrame, hexCentre, hexHeight } from './view/geo.js';
 import { createOrderLine, createUnits } from './view/units.js';
 import { highlightsFor } from './view/overlay.js';
@@ -204,11 +205,25 @@ async function begin({ theatre, difficulty, seed }) {
   const board = createBoard(scene, frame, state.map, state.theatre, { alpha: settings.tileAlpha });
   const castles = createCastles(scene, frame, state.map, state);
   const walls = createWalls(scene, frame, state.map, state);
+  const wallGhosts = createWallGhosts(scene, frame, state.map, state.sides.crown.colours);
   const units = createUnits(scene, frame, state.map, state);
   const orderLine = createOrderLine(scene, frame, state.map);
   const uncage = cageCamera(viewer, frame);
 
-  session = { state, viewer, scene, frame, board, castles, walls, units, orderLine, uncage, handler: null };
+  session = {
+    state,
+    viewer,
+    scene,
+    frame,
+    board,
+    castles,
+    walls,
+    wallGhosts,
+    units,
+    orderLine,
+    uncage,
+    handler: null,
+  };
 
   wireInput();
   frameBoard(viewer, frame);
@@ -239,6 +254,7 @@ function teardown() {
   session.uncage();
   session.orderLine.destroy();
   session.units.destroy();
+  session.wallGhosts.destroy();
   session.walls.destroy();
   session.castles.destroy();
   session.board.destroy();
@@ -262,6 +278,7 @@ function refresh() {
 
   castles.rebuild();
   walls.rebuild();
+  paintWallGhosts();
   units.sync({ selectedId: ui.selectedId });
   previewPath();
   board.setTinted(
@@ -274,6 +291,31 @@ function refresh() {
     }),
   );
   hud.paint(state, ui);
+}
+
+/**
+ * Marks every line the selected column could wall, while it is choosing one.
+ *
+ * `wallTargets` answers for the whole side, so it is narrowed to the column
+ * actually giving the order — otherwise selecting one column would light up the
+ * ground around all of them.
+ */
+function paintWallGhosts() {
+  const { state, wallGhosts } = session;
+  const stack = ui.selectedId === null ? null : state.stacks.get(ui.selectedId);
+
+  if (ui.mode !== 'wall' || !stack || stack.side !== 'crown') {
+    wallGhosts.clear();
+    return;
+  }
+
+  wallGhosts.show(
+    wallTargets(state, 'crown').filter(
+      (target) =>
+        distance(target.from, stack.hex) <= WALLS.buildRange ||
+        distance(target.to, stack.hex) <= WALLS.buildRange,
+    ),
+  );
 }
 
 /** Applies a batch of rules events: sounds, then a redraw. */
@@ -298,6 +340,13 @@ function wireInput() {
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   handler.setInputAction((click) => {
+    // A wall ghost is picked as the line it stands for, not as the hex under
+    // it — clicking the line is the whole point of drawing it.
+    const ghost = pickGhost(click.position);
+    if (ghost) {
+      onClickWallGhost(ghost);
+      return;
+    }
     const hex = pickHex(click.position);
     if (hex !== null) onClickHex(hex);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -306,6 +355,11 @@ function wireInput() {
 
   document.addEventListener('keydown', onKey);
 }
+
+const pickGhost = (position) => {
+  const id = session.scene.pick(position)?.id;
+  return id && typeof id === 'object' && id.kind === 'wallGhost' ? id : null;
+};
 
 /** Whatever was clicked, reduced to the hex it belongs to. */
 function pickHex(position) {
@@ -367,8 +421,12 @@ function onClickHex(hex) {
 
   const stack = ui.selectedId === null ? null : state.stacks.get(ui.selectedId);
 
+  // In wall mode the order is given by clicking one of the marked lines, which
+  // is handled before this. A click on open ground means the player changed
+  // their mind.
   if (ui.mode === 'wall' && stack) {
-    finishWall(stack, hex);
+    ui.mode = 'select';
+    refresh();
     return;
   }
 
@@ -551,14 +609,11 @@ function finishMerge(stack, hex) {
   refresh();
 }
 
-function finishWall(stack, hex) {
-  if (!neighboursOf(stack.hex).includes(hex)) {
-    ui.mode = 'select';
-    refresh();
-    return;
-  }
-  const result = apply(buildWall(session.state, 'crown', stack.hex, hex));
+function onClickWallGhost({ from, to }) {
+  if (ui.mode !== 'wall' || session.state.activeSide !== 'crown') return;
+  const result = apply(buildWall(session.state, 'crown', from, to));
   if (result.ok) ui.mode = 'select';
+  refresh();
 }
 
 function doRecruit(troops) {
