@@ -192,6 +192,7 @@ export function buildPanel(root, on) {
   const modeRow = el('div', 'radio-row');
   const modes = [
     ['primitives', 'Point primitives', 'One PointPrimitiveCollection, one draw call.'],
+    ['buffer', 'Buffer points', 'One BufferPointCollection: the same draw call, points packed in an ArrayBuffer instead of an object each.'],
     ['entities', 'Entities', 'One Entity each, moved through the entity layer.'],
   ];
   const modeInputs = {};
