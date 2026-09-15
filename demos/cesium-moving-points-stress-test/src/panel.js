@@ -19,12 +19,13 @@ import { legendSvg } from './icons.js';
 const SLIDER_STEPS = 1000;
 
 /**
- * Counts run from 0 to 50,000 on one slider, which needs a curve — linear would
- * make everything below 5,000 a single pixel. This is exponential with a
+ * Counts run from 0 to MAX_PER_KIND on one slider, which needs a curve — linear
+ * would make everything below 5,000 a single pixel. This is exponential with a
  * hand-picked sharpness: the midpoint lands near 5k, which is where the
- * interesting range is.
+ * interesting range is. Raising the ceiling without steepening the curve moves
+ * that midpoint up with it, so the two are tuned together.
  */
-const COUNT_CURVE = 4.6;
+const COUNT_CURVE = 6.7;
 const countToSlider = (value) =>
   Math.round((Math.log1p((value / MAX_PER_KIND) * Math.expm1(COUNT_CURVE)) / COUNT_CURVE) * SLIDER_STEPS);
 const sliderToCount = (pos) =>
@@ -39,6 +40,7 @@ const PRESETS = [
   { label: 'Busy', counts: [5000, 5000, 5000, 5000] },
   { label: 'Heavy', counts: [20_000, 20_000, 20_000, 20_000] },
   { label: 'Punishing', counts: [50_000, 50_000, 50_000, 50_000] },
+  { label: 'Absurd', counts: [150_000, 150_000, 150_000, 150_000] },
 ];
 
 export function buildPanel(root, on) {
@@ -75,7 +77,6 @@ export function buildPanel(root, on) {
       step: 1,
       toSlider: countToSlider,
       fromSlider: sliderToCount,
-      format: (v) => v.toLocaleString(),
       onInput: (value) => on.count(kind.index, value),
     });
     countInputs[kind.index] = number;
@@ -92,7 +93,6 @@ export function buildPanel(root, on) {
         min: kind.speed.min,
         max: kind.speed.max,
         step: kind.speed.step,
-        format: (v) => (kind.speed.step < 1 ? v.toFixed(1) : String(v)),
         onInput: (value) => on.speed(kind.index, value),
       }).row,
     );
@@ -107,7 +107,6 @@ export function buildPanel(root, on) {
         min: kind.leg.min,
         max: kind.leg.max,
         step: kind.leg.step,
-        format: (v) => v.toLocaleString(),
         onInput: (value) => on.leg(kind.index, value),
       }).row,
     );
@@ -150,7 +149,6 @@ export function buildPanel(root, on) {
       step: 1,
       toSlider: (v) => logToSlider(v, TIME_SCALE_RANGE.min, TIME_SCALE_RANGE.max),
       fromSlider: (p) => Math.round(sliderToLog(p, TIME_SCALE_RANGE.min, TIME_SCALE_RANGE.max)),
-      format: (v) => v.toLocaleString(),
       onInput: on.timeScale,
     }).row,
   );
@@ -164,7 +162,6 @@ export function buildPanel(root, on) {
       min: 1,
       max: 12,
       step: 1,
-      format: String,
       onInput: on.pointSize,
     }).row,
   );
@@ -267,7 +264,6 @@ function sliderRow({
   step,
   toSlider,
   fromSlider,
-  format,
   onInput,
 }) {
   const curved = typeof toSlider === 'function';
@@ -309,9 +305,17 @@ function sliderRow({
   const unit = el('span', 'unit');
   unit.textContent = suffix;
 
+  // A number input only accepts a bare numeric string. Hand it a grouped
+  // "12,345" and the browser calls the field invalid and blanks it, which is
+  // what dragging a count slider used to do to the box beside it. The decimals
+  // come from the step, so the satellite speed box still reads 0.5 and not
+  // 0.5000000000000001.
+  const decimals = (String(step).split('.')[1] ?? '').length;
+  const fieldValue = (v) => v.toFixed(decimals);
+
   const commit = (raw, source) => {
     const clamped = Math.min(max, Math.max(min, raw));
-    if (source !== 'number') number.value = format(clamped);
+    if (source !== 'number') number.value = fieldValue(clamped);
     if (source !== 'slider') slider.value = String(curved ? toSlider(clamped) : clamped);
     onInput(clamped);
   };
@@ -323,7 +327,7 @@ function sliderRow({
   number.addEventListener('change', () => {
     const parsed = Number(number.value);
     if (Number.isFinite(parsed)) commit(parsed, 'number');
-    else number.value = format(value);
+    else number.value = fieldValue(value);
   });
 
   body.append(slider, number, unit);

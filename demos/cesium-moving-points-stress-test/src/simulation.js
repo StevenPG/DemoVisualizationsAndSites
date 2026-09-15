@@ -144,7 +144,7 @@ export class Simulation {
    *
    * Removals are immediate — dropping a slider should feel instant — while
    * additions are capped per tick. The cap scales with the shortfall so going
-   * from 2k to 50k still converges in a handful of seconds.
+   * from 2k to 150k still converges in a handful of seconds.
    */
   reconcile() {
     for (const kindConfig of KINDS) {

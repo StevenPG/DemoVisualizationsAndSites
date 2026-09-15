@@ -195,7 +195,7 @@ node demos/marchward/scripts/selfplay.mjs 25 all marshal   # 100 headless matche
 ### `cesium-moving-points-stress-test`
 
 Answers "how many independently moving points can CesiumJS hold" by putting up
-to 200,000 of them on the globe at once — ships, aircraft, ground vehicles and
+to 600,000 of them on the globe at once — ships, aircraft, ground vehicles and
 satellites, each with its own heading and a leg to finish before it retires and
 is replaced. The HUD splits the frame into simulation, renderer sync and
 everything Cesium does, so the answer comes with a reason attached, and a

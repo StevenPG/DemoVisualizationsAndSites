@@ -10,8 +10,13 @@ export const PLANE = 1;
 export const GROUND = 2;
 export const SATELLITE = 3;
 
-/** Hard ceiling per kind. The typed arrays in the simulation are sized for 4x this. */
-export const MAX_PER_KIND = 50_000;
+/**
+ * Hard ceiling per kind. The typed arrays in the simulation are sized for 4x
+ * this and allocated up front, which at 150k a kind is roughly 90 MB of
+ * ArrayBuffer on load — paid once, before a single mover exists, and the price
+ * of never reallocating while the ramp is running.
+ */
+export const MAX_PER_KIND = 150_000;
 export const MAX_TOTAL = MAX_PER_KIND * 4;
 
 /**
