@@ -107,7 +107,7 @@ export const GLOBAL_DEFAULTS = {
   rampFpsFloor: 30,
   // Buffer renderer only. 32-bit positions skip the per-point high/low split
   // that 64-bit ones need on the way to the GPU; see BufferRenderer.
-  bufferPositions: 'float32', // 'float32' | 'float64'
+  bufferPositions: 'float32', // one of BUFFER_POSITION_OPTIONS
   bufferBatch: 0,
 };
 
@@ -117,6 +117,24 @@ export const GLOBAL_DEFAULTS = {
  * range per frame, so each point moves less often but the per-frame cost is
  * capped.
  */
+/**
+ * How the buffer renderer stores positions. The datatype is fixed when the
+ * collection is built, so picking a different one rebuilds it. The precision
+ * figures are for an Earth-centred coordinate, which is what every mover has.
+ */
+export const BUFFER_POSITION_OPTIONS = [
+  { id: 'float64', bits: 64, hint: 'exact; every moved point is split into a high and a low float on the CPU' },
+  { id: 'float32', bits: 32, hint: '~0.5 m; copied to the GPU as is' },
+  { id: 'int16', bits: 16, hint: '~245 m; half the upload of 32-bit, visibly steps when zoomed in' },
+];
+
+/**
+ * Radius of the sphere that holds every mover: the globe plus satellites up to
+ * 1,200 km (~7,600 km from the centre) with room to spare. The buffer renderer
+ * uses it as its bounding volume and as the scale of its 16-bit positions.
+ */
+export const WORLD_RADIUS_M = 8_000_000;
+
 export const BUFFER_BATCH_OPTIONS = [0, 200_000, 100_000, 50_000];
 
 export const TIME_SCALE_RANGE = { min: 1, max: 2000 };

@@ -34,10 +34,17 @@
  */
 
 import * as Cesium from 'cesium';
-import { KINDS, MAX_TOTAL } from './config.js';
+import { BUFFER_POSITION_OPTIONS, KINDS, MAX_TOTAL, WORLD_RADIUS_M } from './config.js';
 
 const KIND_COLORS = KINDS.map((kind) => Cesium.Color.fromCssColorString(kind.color));
 const scratch = new Cesium.Cartesian3();
+
+/**
+ * 16-bit positions are normalized shorts: the GPU reads -32767..32767 as
+ * -1..1, and the collection's modelMatrix scales that back up to metres. One
+ * step is WORLD_RADIUS_M / 32767, about 245 m.
+ */
+const INT16_PER_METRE = 32767 / WORLD_RADIUS_M;
 
 export class PointRenderer {
   constructor(scene, pointSize) {
@@ -139,7 +146,8 @@ export class PointRenderer {
  *     referenced, so changing the point size means walking the collection and
  *     setting every material again.
  *   - The position datatype is fixed at construction too, so switching between
- *     32- and 64-bit positions is a rebuild, the same as switching renderers.
+ *     64-, 32- and 16-bit positions is a rebuild, the same as switching
+ *     renderers.
  *
  * Positions go in through setPositions(), one typed array copy over a
  * contiguous range of indices, rather than through setPosition() on the view
@@ -155,7 +163,7 @@ export class BufferRenderer {
    * @param {{px: Float64Array, py: Float64Array, pz: Float64Array}} sim Read on
    *   attach, so a newly spawned point is placed immediately rather than parked
    *   at the origin until its batch comes round.
-   * @param {{positions: 'float32' | 'float64', batch: number}} options
+   * @param {{positions: 'float64' | 'float32' | 'int16', batch: number}} options
    */
   constructor(scene, pointSize, sim, { positions, batch }) {
     this.name = 'buffer';
@@ -181,7 +189,7 @@ export class BufferRenderer {
   }
 
   get label() {
-    const bits = this.positions === 'float32' ? '32-bit' : '64-bit';
+    const bits = `${BUFFER_POSITION_OPTIONS.find((option) => option.id === this.positions).bits}-bit`;
     const batch = this.batch ? `${(this.batch / 1000).toFixed(0)}k/frame` : 'all/frame';
     return `BufferPointCollection · ${bits} · ${batch}`;
   }
@@ -194,7 +202,11 @@ export class BufferRenderer {
    */
   #ensure() {
     if (this.collection) return this.collection;
-    const float32 = this.positions === 'float32';
+    const { positions } = this;
+    const int16 = positions === 'int16';
+    // Stored values are what goes into the buffer: metres for the float types,
+    // scaled shorts for int16. Every write goes through #store().
+    this.scale = int16 ? INT16_PER_METRE : 1;
     this.collection = this.scene.primitives.add(
       new Cesium.BufferPointCollection({
         show: this.visible,
@@ -207,7 +219,18 @@ export class BufferRenderer {
         // useful at. A tighter local frame via `modelMatrix` is the usual way
         // to get precision back, but it only helps when the points share a
         // neighbourhood, and these are spread over the whole planet.
-        positionDatatype: float32 ? Cesium.ComponentDatatype.FLOAT : Cesium.ComponentDatatype.DOUBLE,
+        //
+        // 16-bit halves the upload again and pays for it in precision: the
+        // whole world has to fit in 65,536 steps a side, so one step is about
+        // 245 m. Invisible at globe zoom, obvious once a ship starts hopping
+        // from one step to the next.
+        positionDatatype: {
+          float64: Cesium.ComponentDatatype.DOUBLE,
+          float32: Cesium.ComponentDatatype.FLOAT,
+          int16: Cesium.ComponentDatatype.SHORT,
+        }[positions],
+        positionNormalized: int16,
+        modelMatrix: int16 ? Cesium.Matrix4.fromUniformScale(WORLD_RADIUS_M) : Cesium.Matrix4.IDENTITY,
         blendOption: Cesium.BlendOption.OPAQUE,
         // Picking is what makes click-to-inspect work, and it is not free here:
         // the collection builds one pick id per point the first time it renders
@@ -215,14 +238,15 @@ export class BufferRenderer {
         allowPicking: true,
         // Left unset, the collection recomputes its own bounding sphere after
         // every position update — which for this demo is every frame. One
-        // sphere big enough for the globe and everything in orbit above it
-        // (satellites top out at 1,200 km, so ~7,600 km from the centre) is both
-        // cheaper and never wrong.
-        boundingVolume: new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, 8_000_000),
+        // sphere big enough for the globe and everything in orbit above it is
+        // both cheaper and never wrong. It is in world space, so the int16
+        // modelMatrix does not change it.
+        boundingVolume: new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, WORLD_RADIUS_M),
       }),
     );
     // setPositions() wants the same array type the collection stores.
-    this.staging = float32 ? new Float32Array(MAX_TOTAL * 3) : new Float64Array(MAX_TOTAL * 3);
+    const Staging = { float64: Float64Array, float32: Float32Array, int16: Int16Array }[positions];
+    this.staging = new Staging(MAX_TOTAL * 3);
     this.cursor = 0;
     this.slotToIndex = new Int32Array(MAX_TOTAL).fill(-1);
     this.indexToSlot = new Int32Array(MAX_TOTAL).fill(-1);
@@ -234,6 +258,26 @@ export class BufferRenderer {
 
   get poolSize() {
     return this.collection ? this.collection.primitiveCount : 0;
+  }
+
+  /**
+   * Loads one slot's position into `scratch` in stored units. BufferPoint
+   * writes whatever it is given straight into the typed array, so for int16
+   * the metres have to be scaled and rounded first or they wrap.
+   */
+  #store(slot) {
+    const { px, py, pz } = this.sim;
+    const k = this.scale;
+    if (k === 1) {
+      scratch.x = px[slot];
+      scratch.y = py[slot];
+      scratch.z = pz[slot];
+    } else {
+      scratch.x = Math.round(px[slot] * k);
+      scratch.y = Math.round(py[slot] * k);
+      scratch.z = Math.round(pz[slot] * k);
+    }
+    return scratch;
   }
 
   // Deliberately not ensure()d: hiding a renderer that has been cleared is how
@@ -250,10 +294,7 @@ export class BufferRenderer {
 
   attach(slot, kind) {
     const collection = this.#ensure();
-    const { px, py, pz } = this.sim;
-    scratch.x = px[slot];
-    scratch.y = py[slot];
-    scratch.z = pz[slot];
+    this.#store(slot);
     const index = this.slotToIndex[slot];
     if (index === -1) {
       collection.add({ position: scratch, material: this.materials[kind] }, this.view);
@@ -301,12 +342,26 @@ export class BufferRenderer {
     const { px, py, pz } = sim;
     const staging = this.staging;
     const indexToSlot = this.indexToSlot;
-    for (let index = start; index < end; index++) {
-      const slot = indexToSlot[index];
-      const o = index * 3;
-      staging[o] = px[slot];
-      staging[o + 1] = py[slot];
-      staging[o + 2] = pz[slot];
+    // Two loops rather than one with a branch inside: this runs over every
+    // point, every frame. An Int16Array truncates toward zero, so the int16
+    // loop rounds explicitly.
+    if (this.scale === 1) {
+      for (let index = start; index < end; index++) {
+        const slot = indexToSlot[index];
+        const o = index * 3;
+        staging[o] = px[slot];
+        staging[o + 1] = py[slot];
+        staging[o + 2] = pz[slot];
+      }
+    } else {
+      const k = this.scale;
+      for (let index = start; index < end; index++) {
+        const slot = indexToSlot[index];
+        const o = index * 3;
+        staging[o] = Math.round(px[slot] * k);
+        staging[o + 1] = Math.round(py[slot] * k);
+        staging[o + 2] = Math.round(pz[slot] * k);
+      }
     }
     collection.setPositions(staging.subarray(start * 3, end * 3), start, end - start);
   }

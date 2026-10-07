@@ -15,7 +15,7 @@
  */
 
 import * as Cesium from 'cesium';
-import { ENTITY_MODE_WARN_AT, GLOBAL_DEFAULTS, KINDS, MAX_PER_KIND } from './config.js';
+import { BUFFER_POSITION_OPTIONS, ENTITY_MODE_WARN_AT, GLOBAL_DEFAULTS, KINDS, MAX_PER_KIND } from './config.js';
 import { Hud } from './hud.js';
 import { loadLandMask } from './landmask.js';
 import { buildPanel } from './panel.js';
@@ -181,7 +181,8 @@ async function main() {
     stopRamp();
     selection.clear();
     buffer.clear();
-    rebuild(`${positions === 'float32' ? '32' : '64'}-bit buffer points`);
+    const { bits } = BUFFER_POSITION_OPTIONS.find((option) => option.id === positions);
+    rebuild(`${bits}-bit buffer points`);
   }
 
   function reset() {
