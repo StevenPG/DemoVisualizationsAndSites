@@ -1,0 +1,281 @@
+/* Deliberately not styled like the product. This is an instrument. */
+
+.launcher {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  appearance: none;
+  border: 1px dashed color-mix(in oklab, var(--ax-accent) 55%, var(--ax-border));
+  background: var(--ax-surface);
+  color: var(--ax-text);
+  font: inherit;
+  font-family: var(--ax-mono);
+  font-size: 0.72rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: var(--ax-shadow);
+}
+
+.launcher:hover {
+  border-color: var(--ax-accent);
+}
+
+.launcherDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ax-ok);
+}
+
+.launcherDot[data-bad='true'] {
+  background: var(--ax-critical);
+}
+
+.dock {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: min(30rem, 70vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--ax-surface);
+  border: 1px solid color-mix(in oklab, var(--ax-accent) 40%, var(--ax-border));
+  border-radius: var(--ax-radius);
+  box-shadow: var(--ax-shadow);
+  font-family: var(--ax-mono);
+  font-size: 0.72rem;
+}
+
+.dockHead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--ax-border);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ax-muted);
+  font: inherit;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--ax-radius-sm);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ax-text);
+}
+
+.tabActive {
+  background: color-mix(in oklab, var(--ax-accent) 16%, transparent);
+  border-color: color-mix(in oklab, var(--ax-accent) 40%, transparent);
+  color: var(--ax-text);
+}
+
+.close {
+  margin-left: auto;
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--ax-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.body {
+  overflow: auto;
+  padding: 0.7rem 0.8rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--ax-muted);
+  line-height: 1.55;
+}
+
+.note strong {
+  color: var(--ax-text);
+}
+
+.verdict {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--ax-radius-sm);
+  border: 1px solid;
+  line-height: 1.5;
+}
+
+.verdictGood {
+  border-color: color-mix(in oklab, var(--ax-ok) 45%, var(--ax-border));
+  background: color-mix(in oklab, var(--ax-ok) 8%, transparent);
+}
+
+.verdictBad {
+  border-color: color-mix(in oklab, var(--ax-critical) 50%, var(--ax-border));
+  background: color-mix(in oklab, var(--ax-critical) 8%, transparent);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ax-muted);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--ax-border);
+}
+
+.table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--ax-border) 50%, transparent);
+  vertical-align: top;
+}
+
+.dim {
+  color: var(--ax-muted);
+}
+
+.good {
+  color: var(--ax-ok);
+}
+
+.bad {
+  color: var(--ax-critical);
+}
+
+.warn {
+  color: var(--ax-advisory);
+}
+
+.urls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  word-break: break-all;
+  color: var(--ax-text);
+}
+
+.faultRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--ax-border) 50%, transparent);
+}
+
+.faultButtons {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.chip {
+  appearance: none;
+  border: 1px solid var(--ax-border);
+  background: transparent;
+  color: var(--ax-muted);
+  font: inherit;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--ax-accent);
+}
+
+.chipOn {
+  background: color-mix(in oklab, var(--ax-accent) 18%, transparent);
+  border-color: color-mix(in oklab, var(--ax-accent) 45%, transparent);
+  color: var(--ax-text);
+}
+
+.action {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid var(--ax-border);
+  background: var(--ax-surface-2);
+  color: inherit;
+  font: inherit;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--ax-radius-sm);
+  cursor: pointer;
+}
+
+.action:hover {
+  border-color: var(--ax-accent);
+}
+
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.logLine {
+  display: grid;
+  grid-template-columns: 3.6rem 7rem 11rem 1fr;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--ax-border) 35%, transparent);
+  overflow: hidden;
+}
+
+.logLine > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagBus {
+  color: var(--ax-series-1);
+}
+
+.tagService {
+  color: var(--ax-series-2);
+}
+
+@media (max-width: 48rem) {
+  .logLine {
+    grid-template-columns: 3.2rem 1fr;
+  }
+
+  .logLine > span:nth-child(3),
+  .logLine > span:nth-child(4) {
+    grid-column: 2;
+  }
+}

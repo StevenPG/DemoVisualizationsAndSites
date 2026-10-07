@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
-import { loadManifest } from './manifest.mjs';
+import { loadManifest, ownsItsBuild } from './manifest.mjs';
 import { demoBase, demosDir, distDir, landingDir } from './paths.mjs';
 
 /**
@@ -28,7 +29,18 @@ await build({ root: landingDir, logLevel: 'warn' });
 
 for (const demo of demos) {
   console.log(`→ demos/${demo.slug}${demo.status === 'draft' ? ' (draft — built but unlisted)' : ''}`);
-  await build({ root: path.join(demosDir, demo.slug), logLevel: 'warn' });
+  const demoDir = path.join(demosDir, demo.slug);
+
+  if (ownsItsBuild(demo.slug)) {
+    // A demo that is several applications builds itself: it gets the public
+    // base and the output directory, and is trusted with everything in between.
+    // The index.html check below still applies, so "owns its build" does not
+    // mean "escapes the contract".
+    const { default: buildDemo } = await import(pathToFileURL(path.join(demoDir, 'build.mjs')).href);
+    await buildDemo({ base: demoBase(demo.slug), outDir: path.join(distDir, 'demos', demo.slug) });
+  } else {
+    await build({ root: demoDir, logLevel: 'warn' });
+  }
 
   const html = path.join(distDir, 'demos', demo.slug, 'index.html');
   if (!fs.existsSync(html)) {

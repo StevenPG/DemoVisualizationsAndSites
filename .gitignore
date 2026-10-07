@@ -5,3 +5,5 @@ dist/
 .DS_Store
 npm-debug.log*
 .wrangler/
+# Module Federation build diagnostics (demos/micro-frontend-airspace-console)
+.mf/

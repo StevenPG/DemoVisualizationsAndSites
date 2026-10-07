@@ -1,0 +1,16 @@
+{
+  "name": "@demo/micro-frontend-airspace-console",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Two independent teams, one page: a Module Federation micro frontend reference.",
+  "scripts": {
+    "dev": "node ../../scripts/dev.mjs micro-frontend-airspace-console",
+    "build": "node build.mjs",
+    "typecheck": "npm run typecheck --workspace @airspace/contract --workspace @airspace/shell --workspace @airspace/ops-board --workspace @airspace/analytics --workspace @airspace/notam-ticker"
+  },
+  "devDependencies": {
+    "@module-federation/vite": "^1.20.5",
+    "typescript": "^7.0.2"
+  }
+}
