@@ -2,6 +2,15 @@
   "$schema": "./demos.schema.json",
   "demos": [
     {
+      "slug": "marchward",
+      "title": "Marchward",
+      "description": "A turn-based medieval siege game on a procedurally generated hex board, rendered as extruded terrain over a bounded real-world rectangle in CesiumJS. Officers lead armies of thousands, supply is traced from your castle, and you win by encircling the enemy keep and starving it before you storm it.",
+      "tags": ["game", "cesium", "3d", "strategy", "procedural"],
+      "published": "2026-08-13",
+      "article": null,
+      "status": "live"
+    },
+    {
       "slug": "micro-frontend-airspace-console",
       "title": "A Micro Frontend Reference: Two Teams, One Page",
       "description": "One console assembled in the browser from four independently built and deployed bundles, owned by three teams and integrated only through a versioned contract. Module Federation with React 19 and TypeScript, plus one Svelte remote to prove the boundary is framework-neutral — and an inspector that shows what loaded from where, proves React is shared rather than duplicated, and lets you break a remote on purpose to watch the blast radius stop at its rectangle.",
@@ -13,7 +22,7 @@
     {
       "slug": "cesium-moving-points-stress-test",
       "title": "How Many Moving Points Can CesiumJS Hold?",
-      "description": "Tens of thousands of ships, aircraft, ground vehicles and satellites moving at once as point primitives over ESRI imagery, with a live frame-budget breakdown, an auto-ramp that finds the breaking point, and a click-to-inspect swap from primitive to entity.",
+      "description": "Hundreds of thousands of ships, aircraft, ground vehicles and satellites moving at once as point primitives over ESRI imagery, with a live frame-budget breakdown, an auto-ramp that finds the breaking point, and a renderer switch between PointPrimitiveCollection, BufferPointCollection and entities.",
       "tags": ["cesium", "performance", "webgl", "3d"],
       "published": "2026-08-07",
       "article": null,

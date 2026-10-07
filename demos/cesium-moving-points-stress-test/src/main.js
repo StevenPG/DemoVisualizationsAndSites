@@ -10,8 +10,8 @@
  * The demo is really about three numbers, all of them in the HUD: how long the
  * simulation takes, how long handing the positions to the renderer takes, and
  * how much of the frame is left for Cesium. The renderer switch is there to make
- * the point concrete — the same population through the Entity API instead of a
- * point primitive collection.
+ * the point concrete — the same population through a BufferPointCollection, or
+ * through the Entity API, instead of a point primitive collection.
  */
 
 import * as Cesium from 'cesium';
@@ -19,7 +19,7 @@ import { ENTITY_MODE_WARN_AT, GLOBAL_DEFAULTS, KINDS, MAX_PER_KIND } from './con
 import { Hud } from './hud.js';
 import { loadLandMask } from './landmask.js';
 import { buildPanel } from './panel.js';
-import { attachAll, EntityRenderer, PointRenderer } from './renderers.js';
+import { attachAll, BufferRenderer, EntityRenderer, PointRenderer } from './renderers.js';
 import { Selection } from './selection.js';
 import { Simulation } from './simulation.js';
 import { createViewer } from './viewer.js';
@@ -50,10 +50,16 @@ async function main() {
   };
 
   const sim = new Simulation(landMask);
-  const pointRenderer = new PointRenderer(viewer.scene, GLOBAL_DEFAULTS.pointSize);
-  const entityRenderer = new EntityRenderer(viewer, GLOBAL_DEFAULTS.pointSize);
-  let renderer = pointRenderer;
-  entityRenderer.show = false;
+  const renderers = {
+    primitives: new PointRenderer(viewer.scene, GLOBAL_DEFAULTS.pointSize),
+    buffer: new BufferRenderer(viewer.scene, GLOBAL_DEFAULTS.pointSize, sim, {
+      positions: GLOBAL_DEFAULTS.bufferPositions,
+      batch: GLOBAL_DEFAULTS.bufferBatch,
+    }),
+    entities: new EntityRenderer(viewer, GLOBAL_DEFAULTS.pointSize),
+  };
+  let renderer = renderers[state.renderMode];
+  renderers.entities.show = false;
 
   sim.onSpawn = (slot) => renderer.attach(slot, sim.kind[slot]);
   sim.onDespawn = (slot) => renderer.detach(slot);
@@ -135,26 +141,47 @@ async function main() {
 
     stopRamp();
     selection.clear();
-
     renderer.clear();
     renderer.show = false;
-    renderer = mode === 'entities' ? entityRenderer : pointRenderer;
+    renderer = renderers[mode];
     state.renderMode = mode;
+    rebuild(mode);
+  }
 
-    say(`Rebuilding ${sim.liveCount.toLocaleString()} movers as ${mode}…`, true);
+  /**
+   * Hands every live mover to the active renderer from scratch. The caller has
+   * already stopped the ramp, dropped the selection and cleared whatever was
+   * there before.
+   */
+  function rebuild(description) {
+    say(`Rebuilding ${sim.liveCount.toLocaleString()} movers as ${description}…`, true);
     // Yield once so the message actually paints before the long rebuild.
     window.setTimeout(() => {
       const started = performance.now();
       attachAll(renderer, sim);
-      // attachAll parks everything at the origin; this is the frame that puts
-      // them where they actually are.
+      // attachAll parks primitives and entities at the origin; this is the
+      // frame that puts them where they actually are.
       renderer.sync(sim);
       renderer.show = true;
       selection.reapplyTo(renderer);
       say(
-        `Rebuilt ${sim.liveCount.toLocaleString()} movers as ${mode} in ${(performance.now() - started).toFixed(0)} ms.`,
+        `Rebuilt ${sim.liveCount.toLocaleString()} movers as ${description} in ${(performance.now() - started).toFixed(0)} ms.`,
       );
     }, 0);
+  }
+
+  /** The position datatype is fixed when a buffer collection is built, so this is a rebuild. */
+  function setBufferPositions(positions) {
+    const buffer = renderers.buffer;
+    if (positions === buffer.positions) return;
+    buffer.positions = positions;
+    // An inactive renderer was cleared when it was switched away from, so the
+    // next build picks the new datatype up on its own.
+    if (renderer !== buffer) return;
+    stopRamp();
+    selection.clear();
+    buffer.clear();
+    rebuild(`${positions === 'float32' ? '32' : '64'}-bit buffer points`);
   }
 
   function reset() {
@@ -182,8 +209,7 @@ async function main() {
     leg: (kind, value) => sim.setLegKm(kind, value),
     timeScale: (value) => (state.timeScale = value),
     pointSize: (value) => {
-      pointRenderer.setPointSize(value);
-      entityRenderer.setPointSize(value);
+      for (const each of Object.values(renderers)) each.setPointSize(value);
     },
     terrain: async (enabled) => {
       const applied = await setTerrain(enabled);
@@ -195,6 +221,8 @@ async function main() {
     },
     pause: (paused) => (state.paused = paused),
     renderMode: setRenderMode,
+    bufferPositions: setBufferPositions,
+    bufferBatch: (batch) => renderers.buffer.setBatch(batch),
     ramp: () => {
       if (ramp.active) {
         stopRamp('Ramp stopped.');
@@ -211,6 +239,7 @@ async function main() {
   });
 
   panel.setTerrain(state.terrain);
+  panel.setRenderMode(state.renderMode);
   if (notes.length) say(notes.join(' '), true);
 
   // ------------------------------------------------------------ main loop

@@ -95,7 +95,7 @@ export class Hud {
     set('live', live.toLocaleString());
     set('pool', renderer.poolSize.toLocaleString());
     set('churn', `+${this.spawnRate.toFixed(0)} / −${this.despawnRate.toFixed(0)} per s`);
-    set('mode', renderer.name === 'primitives' ? 'PointPrimitiveCollection' : 'Entity + PointGraphics');
+    set('mode', renderer.label);
     set('draws', this.drawCommands === null ? '—' : this.drawCommands.toLocaleString());
     set('tiles', state.terrain ? (this.tilesStreaming ? 'streaming' : 'idle') : 'off');
     set('perPoint', live > 0 ? `${((this.simMs + this.syncMs) * 1000 / live).toFixed(2)} µs` : '—');
