@@ -472,12 +472,16 @@ input.number {
   display: none;
 }
 
-.sub-options .toggle {
-  margin-top: 0;
+.sub-options .radio-row {
+  margin-top: 6px;
 }
 
 .sub-head {
   margin-top: 10px;
+}
+
+.sub-options > .sub-head:first-child {
+  margin-top: 0;
 }
 
 .sub-head b {

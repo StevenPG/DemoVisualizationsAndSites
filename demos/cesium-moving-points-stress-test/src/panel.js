@@ -10,6 +10,7 @@
 
 import {
   BUFFER_BATCH_OPTIONS,
+  BUFFER_POSITION_OPTIONS,
   GLOBAL_DEFAULTS,
   KINDS,
   MAX_PER_KIND,
@@ -216,14 +217,23 @@ export function buildPanel(root, on) {
 
   // Only meaningful for the buffer renderer, so only shown while it is active.
   const bufferOptions = el('div', 'sub-options');
-  const float32 = checkboxRow({
-    id: 'buffer-float32',
-    label: '32-bit positions',
-    hint: 'off stores doubles and splits each one into a high and low float on the way to the GPU; switching rebuilds the collection',
-    checked: GLOBAL_DEFAULTS.bufferPositions === 'float32',
-    onChange: (checked) => on.bufferPositions(checked ? 'float32' : 'float64'),
-  });
-  bufferOptions.append(float32.row);
+  const positionsHead = el('div', 'sub-head');
+  positionsHead.innerHTML =
+    '<b>Position precision</b><small>fixed when the collection is built, so switching rebuilds it</small>';
+  const positionsRow = el('div', 'radio-row');
+  for (const option of BUFFER_POSITION_OPTIONS) {
+    const wrapper = el('label', 'radio');
+    wrapper.innerHTML =
+      `<input type="radio" name="buffer-positions" value="${option.id}" ${
+        option.id === GLOBAL_DEFAULTS.bufferPositions ? 'checked' : ''
+      } />` + `<span><b>${option.bits}-bit</b><small>${option.hint}</small></span>`;
+    const input = wrapper.querySelector('input');
+    input.addEventListener('change', () => {
+      if (input.checked) on.bufferPositions(option.id);
+    });
+    positionsRow.append(wrapper);
+  }
+  bufferOptions.append(positionsHead, positionsRow);
 
   const batchHead = el('div', 'sub-head');
   batchHead.innerHTML =

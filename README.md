@@ -201,7 +201,7 @@ is replaced. The HUD splits the frame into simulation, renderer sync and
 everything Cesium does, so the answer comes with a reason attached, and a
 renderer switch rebuilds the same population through a BufferPointCollection or
 the Entity API for the comparison. In buffer mode, positions are bulk-copied with
-`setPositions()`, stored as 32- or 64-bit floats, and can be refreshed a slice
+`setPositions()`, stored as 64-bit, 32-bit or normalized 16-bit values, and can be refreshed a slice
 of the collection per frame, all switchable from the panel. Clicking any point promotes it to a real entity with a pin, a track
 and a property table.
 
