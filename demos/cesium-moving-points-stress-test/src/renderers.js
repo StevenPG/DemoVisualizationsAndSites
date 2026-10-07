@@ -13,9 +13,11 @@
  *                   the points live in an ArrayBuffer the collection owns
  *                   rather than as one JavaScript object each, and are reached
  *                   through a flyweight BufferPoint rebound per access. That
- *                   is the whole difference, and it is a big one at this scale
+ *                   is the main difference, and it is a big one at this scale
  *                   — a PointPrimitiveCollection of 600k points is 600k live
- *                   objects for the garbage collector to walk.
+ *                   objects for the garbage collector to walk. Positions are
+ *                   bulk-copied in with setPositions(), optionally as 32-bit
+ *                   floats and optionally a slice of the collection per frame.
  *
  *   EntityRenderer  one Entity per mover through the entity layer, moved via
  *                   ConstantPositionProperty.setValue(). Worth being precise
@@ -126,7 +128,7 @@ export class PointRenderer {
  * index to read or write one, so 600k points cost 600k slots in a buffer rather
  * than 600k JavaScript objects.
  *
- * Three consequences shape this class:
+ * Four consequences shape this class:
  *
  *   - The buffers cannot grow, so capacity is declared up front. MAX_TOTAL is
  *     the only honest number available: slots are handed out by the simulation
@@ -136,13 +138,34 @@ export class PointRenderer {
  *   - A material is copied into the buffer when you call setMaterial, not
  *     referenced, so changing the point size means walking the collection and
  *     setting every material again.
+ *   - The position datatype is fixed at construction too, so switching between
+ *     32- and 64-bit positions is a rebuild, the same as switching renderers.
+ *
+ * Positions go in through setPositions(), one typed array copy over a
+ * contiguous range of indices, rather than through setPosition() on the view
+ * once per point. Each frame updates one range, and the collection uploads
+ * that range and nothing else, which is what makes the batch option work: at
+ * 100k a frame, 600k points are refreshed over six frames instead of all in
+ * one.
  */
 export class BufferRenderer {
-  constructor(scene, pointSize) {
+  /**
+   * @param {Cesium.Scene} scene
+   * @param {number} pointSize
+   * @param {{px: Float64Array, py: Float64Array, pz: Float64Array}} sim Read on
+   *   attach, so a newly spawned point is placed immediately rather than parked
+   *   at the origin until its batch comes round.
+   * @param {{positions: 'float32' | 'float64', batch: number}} options
+   */
+  constructor(scene, pointSize, sim, { positions, batch }) {
     this.name = 'buffer';
-    this.label = 'BufferPointCollection';
     this.scene = scene;
     this.pointSize = pointSize;
+    this.sim = sim;
+    this.positions = positions;
+    /** Indices refreshed per frame; 0 means all of them. */
+    this.batch = batch;
+    this.cursor = 0;
     this.materials = KINDS.map(
       (kind) => new Cesium.BufferPointMaterial({ color: KIND_COLORS[kind.index], size: pointSize }),
     );
@@ -151,9 +174,16 @@ export class BufferRenderer {
     this.view = new Cesium.BufferPoint();
     this.visible = true;
     this.collection = null;
+    this.staging = null;
     this.slotToIndex = null;
     this.indexToSlot = null;
     this.indexKind = null;
+  }
+
+  get label() {
+    const bits = this.positions === 'float32' ? '32-bit' : '64-bit';
+    const batch = this.batch ? `${(this.batch / 1000).toFixed(0)}k/frame` : 'all/frame';
+    return `BufferPointCollection · ${bits} · ${batch}`;
   }
 
   /**
@@ -164,22 +194,36 @@ export class BufferRenderer {
    */
   #ensure() {
     if (this.collection) return this.collection;
+    const float32 = this.positions === 'float32';
     this.collection = this.scene.primitives.add(
       new Cesium.BufferPointCollection({
         show: this.visible,
         primitiveCountMax: MAX_TOTAL,
+        // 64-bit positions are split into a high and a low float on the CPU for
+        // every point that moved, so the GPU can render them relative to the
+        // eye without jitter. 32-bit positions skip that and go up as they are.
+        // The cost is precision: a float32 holds an Earth-centred coordinate to
+        // about half a metre, which is invisible at the zoom a 4px dot is
+        // useful at. A tighter local frame via `modelMatrix` is the usual way
+        // to get precision back, but it only helps when the points share a
+        // neighbourhood, and these are spread over the whole planet.
+        positionDatatype: float32 ? Cesium.ComponentDatatype.FLOAT : Cesium.ComponentDatatype.DOUBLE,
         blendOption: Cesium.BlendOption.OPAQUE,
         // Picking is what makes click-to-inspect work, and it is not free here:
         // the collection builds one pick id per point the first time it renders
         // after the population grows.
         allowPicking: true,
-        // Left unset, the collection recomputes its own bounding sphere every
-        // time a position changes — which for this demo is every point, every
-        // frame. One sphere big enough for the globe and everything in orbit
-        // above it is both cheaper and never wrong.
+        // Left unset, the collection recomputes its own bounding sphere after
+        // every position update — which for this demo is every frame. One
+        // sphere big enough for the globe and everything in orbit above it
+        // (satellites top out at 1,200 km, so ~7,600 km from the centre) is both
+        // cheaper and never wrong.
         boundingVolume: new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, 8_000_000),
       }),
     );
+    // setPositions() wants the same array type the collection stores.
+    this.staging = float32 ? new Float32Array(MAX_TOTAL * 3) : new Float64Array(MAX_TOTAL * 3);
+    this.cursor = 0;
     this.slotToIndex = new Int32Array(MAX_TOTAL).fill(-1);
     this.indexToSlot = new Int32Array(MAX_TOTAL).fill(-1);
     // Which kind sits at each index, so a point size change can rewrite every
@@ -206,9 +250,13 @@ export class BufferRenderer {
 
   attach(slot, kind) {
     const collection = this.#ensure();
+    const { px, py, pz } = this.sim;
+    scratch.x = px[slot];
+    scratch.y = py[slot];
+    scratch.z = pz[slot];
     const index = this.slotToIndex[slot];
     if (index === -1) {
-      collection.add({ position: Cesium.Cartesian3.ZERO, material: this.materials[kind] }, this.view);
+      collection.add({ position: scratch, material: this.materials[kind] }, this.view);
       const added = collection.primitiveCount - 1;
       this.slotToIndex[slot] = added;
       this.indexToSlot[added] = slot;
@@ -216,6 +264,7 @@ export class BufferRenderer {
       return;
     }
     collection.get(index, this.view);
+    this.view.setPosition(scratch);
     this.view.setMaterial(this.materials[kind]);
     this.view.show = true;
     this.indexKind[index] = kind;
@@ -229,24 +278,42 @@ export class BufferRenderer {
     this.view.show = false;
   }
 
+  /**
+   * Walks collection indices rather than the simulation's live groups, so the
+   * write is one contiguous range. A slot keeps its index for good, so the
+   * hidden points in the range belong to retired movers and get whatever the
+   * simulation last left in their slot — harmless, since they are not drawn.
+   */
   sync(sim) {
     const collection = this.collection;
     if (!collection) return;
-    const { px, py, pz } = sim;
-    const slotToIndex = this.slotToIndex;
-    const view = this.view;
-    for (const group of sim.groups) {
-      const slots = group.slots;
-      for (let a = 0; a < group.count; a++) {
-        const i = slots[a];
-        const index = slotToIndex[i];
-        if (index === -1) continue;
-        scratch.x = px[i];
-        scratch.y = py[i];
-        scratch.z = pz[i];
-        collection.get(index, view).setPosition(scratch);
-      }
+    const count = collection.primitiveCount;
+    if (count === 0) return;
+
+    let start = 0;
+    let end = count;
+    if (this.batch > 0 && this.batch < count) {
+      start = this.cursor < count ? this.cursor : 0;
+      end = Math.min(count, start + this.batch);
+      this.cursor = end < count ? end : 0;
     }
+
+    const { px, py, pz } = sim;
+    const staging = this.staging;
+    const indexToSlot = this.indexToSlot;
+    for (let index = start; index < end; index++) {
+      const slot = indexToSlot[index];
+      const o = index * 3;
+      staging[o] = px[slot];
+      staging[o + 1] = py[slot];
+      staging[o + 2] = pz[slot];
+    }
+    collection.setPositions(staging.subarray(start * 3, end * 3), start, end - start);
+  }
+
+  /** Takes effect from the next frame; the cursor carries on where it was. */
+  setBatch(batch) {
+    this.batch = batch;
   }
 
   setPointSize(size) {
@@ -269,6 +336,7 @@ export class BufferRenderer {
     if (this.collection) {
       this.scene.primitives.remove(this.collection); // destroys it and its GPU resources
       this.collection = null;
+      this.staging = null;
       this.slotToIndex = null;
       this.indexToSlot = null;
       this.indexKind = null;
