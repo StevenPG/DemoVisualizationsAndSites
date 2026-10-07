@@ -103,9 +103,21 @@ export const GLOBAL_DEFAULTS = {
   // and it competes for the same frames the HUD is trying to measure. The
   // checkbox turns it on in one click, which is the point of having it.
   terrain: false,
-  renderMode: 'primitives', // 'primitives' | 'entities'
+  renderMode: 'primitives', // 'primitives' | 'buffer' | 'entities'
   rampFpsFloor: 30,
+  // Buffer renderer only. 32-bit positions skip the per-point high/low split
+  // that 64-bit ones need on the way to the GPU; see BufferRenderer.
+  bufferPositions: 'float32', // 'float32' | 'float64'
+  bufferBatch: 0,
 };
+
+/**
+ * How many buffer points get fresh positions each frame. 0 is all of them;
+ * anything smaller spreads the update over several frames, one contiguous
+ * range per frame, so each point moves less often but the per-frame cost is
+ * capped.
+ */
+export const BUFFER_BATCH_OPTIONS = [0, 200_000, 100_000, 50_000];
 
 export const TIME_SCALE_RANGE = { min: 1, max: 2000 };
 

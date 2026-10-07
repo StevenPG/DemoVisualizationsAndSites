@@ -9,6 +9,7 @@
  */
 
 import {
+  BUFFER_BATCH_OPTIONS,
   GLOBAL_DEFAULTS,
   KINDS,
   MAX_PER_KIND,
@@ -192,7 +193,7 @@ export function buildPanel(root, on) {
   const modeRow = el('div', 'radio-row');
   const modes = [
     ['primitives', 'Point primitives', 'One PointPrimitiveCollection, one draw call.'],
-    ['buffer', 'Buffer points', 'One BufferPointCollection: the same draw call, points packed in an ArrayBuffer instead of an object each.'],
+    ['buffer', 'Buffer points', 'One BufferPointCollection: the same draw call, points packed in an ArrayBuffer instead of an object each, positions bulk-copied in per frame.'],
     ['entities', 'Entities', 'One Entity each, moved through the entity layer.'],
   ];
   const modeInputs = {};
@@ -205,11 +206,56 @@ export function buildPanel(root, on) {
     const input = wrapper.querySelector('input');
     modeInputs[value] = input;
     input.addEventListener('change', () => {
-      if (input.checked) on.renderMode(value);
+      if (!input.checked) return;
+      showBufferOptions(value);
+      on.renderMode(value);
     });
     modeRow.append(wrapper);
   }
   renderer.append(modeRow);
+
+  // Only meaningful for the buffer renderer, so only shown while it is active.
+  const bufferOptions = el('div', 'sub-options');
+  const float32 = checkboxRow({
+    id: 'buffer-float32',
+    label: '32-bit positions',
+    hint: 'off stores doubles and splits each one into a high and low float on the way to the GPU; switching rebuilds the collection',
+    checked: GLOBAL_DEFAULTS.bufferPositions === 'float32',
+    onChange: (checked) => on.bufferPositions(checked ? 'float32' : 'float64'),
+  });
+  bufferOptions.append(float32.row);
+
+  const batchHead = el('div', 'sub-head');
+  batchHead.innerHTML =
+    '<b>Positions updated per frame</b>' +
+    '<small>one contiguous range a frame, spreading the cost over several</small>';
+  const batchRow = el('div', 'button-row');
+  const batchButtons = BUFFER_BATCH_OPTIONS.map((batch) => {
+    const button = el('button', 'chip');
+    button.type = 'button';
+    button.textContent = batch === 0 ? 'All' : `${batch / 1000}k`;
+    button.addEventListener('click', () => {
+      selectBatch(batch);
+      on.bufferBatch(batch);
+    });
+    return [batch, button];
+  });
+  for (const [, button] of batchButtons) batchRow.append(button);
+  function selectBatch(selected) {
+    for (const [batch, button] of batchButtons) {
+      const active = batch === selected;
+      button.classList.toggle('primary', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+  selectBatch(GLOBAL_DEFAULTS.bufferBatch);
+  bufferOptions.append(batchHead, batchRow);
+  modeInputs.buffer.closest('.radio').after(bufferOptions);
+
+  function showBufferOptions(mode) {
+    bufferOptions.hidden = mode !== 'buffer';
+  }
+  showBufferOptions(GLOBAL_DEFAULTS.renderMode);
 
   const rampRow = el('div', 'button-row');
   const rampButton = el('button', 'chip primary');
@@ -241,6 +287,7 @@ export function buildPanel(root, on) {
     },
     setRenderMode(mode) {
       modeInputs[mode].checked = true;
+      showBufferOptions(mode);
     },
     setRamping(active) {
       rampButton.textContent = active ? 'Stop ramping' : 'Ramp until it breaks';

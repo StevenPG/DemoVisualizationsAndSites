@@ -462,6 +462,41 @@ input.number {
   color: #ffd7e1;
 }
 
+.sub-options {
+  margin-left: 22px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.sub-options[hidden] {
+  display: none;
+}
+
+.sub-options .toggle {
+  margin-top: 0;
+}
+
+.sub-head {
+  margin-top: 10px;
+}
+
+.sub-head b {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sub-head small {
+  display: block;
+  color: var(--dim);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.sub-options .button-row {
+  margin-top: 6px;
+}
+
 .note {
   margin: 9px 0 0;
   color: var(--dim);
